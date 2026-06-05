@@ -1,0 +1,19 @@
+# Entorno virtual
+venv/
+
+# Variables de entorno
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Bases SQLite (por si algún día las usas)
+*.sqlite3
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
