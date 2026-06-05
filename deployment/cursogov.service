@@ -1,0 +1,23 @@
+[Unit]
+Description=CursoGov Django Gunicorn
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/cursogov/backend
+EnvironmentFile=/var/www/cursogov/.env
+ExecStart=/var/www/cursogov/venv/bin/gunicorn \
+    --access-logfile /var/log/gunicorn/access.log \
+    --error-logfile /var/log/gunicorn/error.log \
+    --workers 4 \
+    --bind 127.0.0.1:8000 \
+    config.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
