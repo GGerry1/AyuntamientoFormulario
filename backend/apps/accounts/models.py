@@ -59,6 +59,7 @@ class Administrator(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
+    EMAIL_FIELD = 'email'
     REQUIRED_FIELDS = []
 
     objects = AdministratorManager()
@@ -69,6 +70,10 @@ class Administrator(AbstractBaseUser, PermissionsMixin):
         db_table = 'administrators'
 
     def __str__(self):
+        return self.email
+
+    @property
+    def username(self):
         return self.email
 
     @property
