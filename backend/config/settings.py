@@ -119,6 +119,7 @@ ACCOUNT_ADAPTER = 'apps.accounts.adapters.NoPasswordAdapter'
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_EMAIL_REQUIRED = True
 SOCIALACCOUNT_ADAPTER = 'apps.accounts.adapters.SocialAccountAdapter'
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https' if not DEBUG else 'http'
 SOCIALACCOUNT_STORE_TOKENS = True
 
 SOCIALACCOUNT_PROVIDERS = {
@@ -221,7 +222,8 @@ CELERY_TASK_SERIALIZER = 'json'
 # ─────────────────────────────────────────────
 # APP CONFIG
 # ─────────────────────────────────────────────
-SITE_BASE_URL = config('SITE_BASE_URL', default='https://tusitio.com')
+SITE_BASE_URL = config('SITE_BASE_URL', default='http://localhost:5173')
+
 
 TEMPLATES = [
     {
