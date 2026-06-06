@@ -60,6 +60,12 @@ INSTALLED_APPS = [
 
 SITE_ID = 1
 
+# Override Sites Framework domain for production
+if not DEBUG:
+    SITE_DOMAIN = 'ayuntamientoformulario-1.onrender.com'
+else:
+    SITE_DOMAIN = 'localhost:8000'
+
 # ─────────────────────────────────────────────
 # MIDDLEWARE
 # ─────────────────────────────────────────────
