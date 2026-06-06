@@ -238,3 +238,23 @@ LANGUAGE_CODE = 'es-mx'
 TIME_ZONE = 'America/Mexico_City'
 USE_I18N = True
 USE_TZ = True
+
+# Fix Django Sites Framework domain for production
+import os
+if not DEBUG:
+    from django.db.models.signals import post_migrate
+    from django.dispatch import receiver
+    
+    @receiver(post_migrate)
+    def update_site_domain(sender, **kwargs):
+        try:
+            from django.contrib.sites.models import Site
+            Site.objects.update_or_create(
+                id=1,
+                defaults={
+                    'domain': 'ayuntamientoformulario-1.onrender.com',
+                    'name': 'CursoGov'
+                }
+            )
+        except Exception:
+            pass
