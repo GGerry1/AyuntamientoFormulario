@@ -273,3 +273,5 @@ if not DEBUG:
             )
         except Exception:
             pass
+
+LOGIN_REDIRECT_URL = config('SITE_BASE_URL', default='http://localhost:5173') + '/auth/callback'

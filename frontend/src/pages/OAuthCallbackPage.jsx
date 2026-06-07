@@ -15,17 +15,28 @@ export default function OAuthCallbackPage() {
 
   useEffect(() => {
     async function handleCallback() {
-      try {
-        // Django redirects here after OAuth success; fetch tokens from callback endpoint
-        const { data } = await api.get('/auth/oauth/callback/');
-        loginWithTokens(data.access, data.refresh, data.user);
-        navigate('/dashboard', { replace: true });
-      } catch (err) {
-        setError('No se pudo completar la autenticacion. Por favor intenta de nuevo.');
-      }
+        try {
+            const access = params.get('access');
+            const refresh = params.get('refresh');
+
+            if (access && refresh) {
+                // Tokens vienen en la URL desde Django
+                api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+                const { data: user } = await api.get('/accounts/me/');
+                loginWithTokens(access, refresh, user);
+                navigate('/dashboard', { replace: true });
+            } else {
+                // Fallback legacy
+                const { data } = await api.get('/auth/oauth/callback/');
+                loginWithTokens(data.access, data.refresh, data.user);
+                navigate('/dashboard', { replace: true });
+            }
+        } catch (err) {
+            setError('No se pudo completar la autenticacion. Por favor intenta de nuevo.');
+        }
     }
     handleCallback();
-  }, []);
+}, []);
 
   if (error) {
     return (
