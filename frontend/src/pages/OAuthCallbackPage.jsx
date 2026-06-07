@@ -13,23 +13,20 @@ export default function OAuthCallbackPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
-  useEffect(() => {
+useEffect(() => {
     async function handleCallback() {
         try {
             const access = params.get('access');
             const refresh = params.get('refresh');
 
-            if (access && refresh) {
-                // Tokens vienen en la URL desde Django
+            if (access) {
+                // Tokens vienen en la URL — usarlos directamente
                 api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
                 const { data: user } = await api.get('/accounts/me/');
-                loginWithTokens(access, refresh, user);
+                loginWithTokens(access, refresh || '', user);
                 navigate('/dashboard', { replace: true });
             } else {
-                // Fallback legacy
-                const { data } = await api.get('/auth/oauth/callback/');
-                loginWithTokens(data.access, data.refresh, data.user);
-                navigate('/dashboard', { replace: true });
+                setError('No se recibieron credenciales. Por favor intenta de nuevo.');
             }
         } catch (err) {
             setError('No se pudo completar la autenticacion. Por favor intenta de nuevo.');
