@@ -275,6 +275,8 @@ if not DEBUG:
             pass
 
 
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/accounts/oauth-success/'
 LOGOUT_REDIRECT_URL = '/'
-SOCIALACCOUNT_LOGIN_REDIRECT_URL = '/'
+SOCIALACCOUNT_LOGIN_REDIRECT_URL = '/accounts/oauth-success/'
+
+
