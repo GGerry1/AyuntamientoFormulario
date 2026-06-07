@@ -45,12 +45,12 @@ export default function AdminLoginPage() {
 
   const loginWithGoogle = () => {
     if (!captchaOk) return;
-    window.location.href = `${API_BASE}/accounts/google/login/?process=login&next=/auth/callback`;
+    window.location.href =`${API_BASE}/accounts/google/login/?process=login`;
   };
 
   const loginWithMicrosoft = () => {
     if (!captchaOk) return;
-    window.location.href = `${API_BASE}/accounts/microsoft/login/?process=login&next=/auth/callback`;
+    window.location.href =`${API_BASE}/accounts/microsoft/login/?process=login`;
   };
 
   return (
