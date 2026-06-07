@@ -20,17 +20,28 @@ useEffect(() => {
             const refresh = params.get('refresh');
 
             if (access) {
-                // Tokens vienen en la URL — usarlos directamente
+                // Tokens vienen en la URL — usarlos direcgortamente
                 api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
-                const { data: user } = await api.get('/accounts/me/');
+                const { data: user } = await api.get('/auth/me/');
                 loginWithTokens(access, refresh || '', user);
                 navigate('/dashboard', { replace: true });
             } else {
                 setError('No se recibieron credenciales. Por favor intenta de nuevo.');
             }
         } catch (err) {
-            setError('No se pudo completar la autenticacion. Por favor intenta de nuevo.');
-        }
+    console.error('ERROR COMPLETO:', err);
+
+    if (err.response) {
+        console.error('STATUS:', err.response.status);
+        console.error('DATA:', err.response.data);
+
+        setError(
+            `Error ${err.response.status}: ${JSON.stringify(err.response.data)}`
+        );
+    } else {
+        setError(err.message);
+    }
+}
     }
     handleCallback();
 }, []);
