@@ -4,14 +4,12 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.accounts.views import OAuthSuccessView
+
 urlpatterns = [
-    # Django admin (optional, can be disabled in production)
     path('django-admin/', admin.site.urls),
-
-    # OAuth / allauth
     path('accounts/', include('allauth.urls')),
-
-    # API
+    path('accounts/oauth-success/', OAuthSuccessView.as_view(), name='oauth-success'),  # ← AGREGA
     path('api/v1/', include([
         path('auth/', include('apps.accounts.urls')),
         path('courses/', include('apps.courses.urls')),
