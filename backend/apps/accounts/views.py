@@ -85,15 +85,30 @@ from django.shortcuts import redirect as django_redirect
 from django.views import View
 
 class OAuthSuccessView(View):
-    """Emite JWT y redirige al frontend con los tokens en la URL."""
+
     def get(self, request):
         from django.conf import settings
-        user = request.user
-        if not user.is_authenticated:
-            return django_redirect(f"{settings.SITE_BASE_URL}/admin?error=auth_failed")
-        refresh = RefreshToken.for_user(user)
+
+        print("===== OAUTH SUCCESS =====")
+        print("USER:", request.user)
+        print("AUTH:", request.user.is_authenticated)
+        print("SITE_BASE_URL:", settings.SITE_BASE_URL)
+
+        if not request.user.is_authenticated:
+            return django_redirect(
+                f"{settings.SITE_BASE_URL}/admin?error=auth_failed"
+            )
+
+        refresh = RefreshToken.for_user(request.user)
+
         access = str(refresh.access_token)
         ref = str(refresh)
-        return django_redirect(
-            f"{settings.SITE_BASE_URL}/auth/callback?access={access}&refresh={ref}"
+
+        redirect_url = (
+            f"{settings.SITE_BASE_URL}/auth/callback"
+            f"?access={access}&refresh={ref}"
         )
+
+        print("REDIRECT URL:", redirect_url)
+
+        return django_redirect(redirect_url)
