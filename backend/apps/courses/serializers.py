@@ -104,10 +104,17 @@ class CourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = [
-            'id', 'titulo', 'descripcion', 'instructores',
-            'fecha_inicio', 'fecha_fin', 'activo',
-            'fecha_creacion', 'form_fields', 'total_inscritos',
-        ]
+    'id',
+    'titulo',
+    'descripcion',
+    'instructores',
+    'fecha_inicio',
+    'fecha_fin',
+    'activo',
+    'fecha_creacion',
+    'form_fields',
+    'total_inscritos',
+]
         read_only_fields = ['id', 'fecha_creacion']
 
     def get_total_inscritos(self, obj):

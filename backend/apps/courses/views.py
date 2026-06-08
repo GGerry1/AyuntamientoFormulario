@@ -236,7 +236,9 @@ class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Course.objects.filter(administrador=self.request.user)
+     return Course.objects.filter(
+        administrador=self.request.user
+    )
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
@@ -260,23 +262,60 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         course = self.get_object()
-        # Preserve registrations: SET_NULL handled by model
-        # If this was the active course, just delete it
-        course.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['patch'])
-    def toggle_active(self, request, pk=None):
-        """Activate or deactivate a plantilla."""
-        course = self.get_object()
-        serializer = CourseActivateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        activate = serializer.validated_data['activo']
-        if activate:
-            course.activate()
-        else:
-            course.deactivate()
-        return Response(CourseSerializer(course).data)
+        course.archivado = True
+        course.activo = False
+
+        course.save(
+        update_fields=[
+            'archivado',
+            'activo'
+        ]
+    )
+
+        return Response({
+        'detail': 'Plantilla archivada correctamente.'
+    })
+
+@action(detail=True, methods=['patch'])
+def toggle_active(self, request, pk=None):
+
+    course = self.get_object()
+
+    if course.archivado:
+        return Response(
+            {
+                'detail': 'No puedes activar una plantilla archivada.'
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    serializer = CourseActivateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    activate = serializer.validated_data['activo']
+
+    if activate:
+        course.activate()
+    else:
+        course.deactivate()
+
+    return Response(
+        CourseSerializer(course).data
+    )
+
+
+@action(detail=True, methods=['patch'])
+def restore(self, request, pk=None):
+
+    course = self.get_object()
+
+    course.archivado = False
+    course.save(update_fields=['archivado'])
+
+    return Response(
+        CourseSerializer(course).data
+    )
 
     @action(detail=True, methods=['get'])
     def registrations(self, request, pk=None):
@@ -767,3 +806,6 @@ class SendDiplomaView(APIView):
             'mensaje': f'Diploma enviado a {reg.email_participante}',
             'diploma_enviado': True,
         })
+
+
+   
