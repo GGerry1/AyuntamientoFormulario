@@ -295,7 +295,7 @@ export default function CoursesPage() {
           ) : courses.length === 0 ? (
             <p style={styles.empty}>No tienes plantillas. Crea la primera.</p>
           ) : (
-            activeCourses(c => (
+            activeCourses.map(c => (
               <div
                 key={c.id}
                 style={{
