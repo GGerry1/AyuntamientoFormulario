@@ -26,6 +26,7 @@ class Course(models.Model):
     fecha_fin = models.DateField(null=True, blank=True)
     # Only one course per admin can be activo=True at a time
     activo = models.BooleanField(default=False)
+    archivado = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
