@@ -271,51 +271,50 @@ class CourseViewSet(viewsets.ModelViewSet):
             'archivado',
             'activo'
         ]
-    )
+        )
 
         return Response({
         'detail': 'Plantilla archivada correctamente.'
-    })
+        })
 
-@action(detail=True, methods=['patch'])
-def toggle_active(self, request, pk=None):
+    @action(detail=True, methods=['patch'])
+    def toggle_active(self, request, pk=None):
 
-    course = self.get_object()
+        course = self.get_object()
 
-    if course.archivado:
-        return Response(
-            {
-                'detail': 'No puedes activar una plantilla archivada.'
+        if course.archivado:
+            return Response(
+                {'detail': 'No puedes activar una plantilla archivada.'
             },
             status=status.HTTP_400_BAD_REQUEST
-        )
+            )
 
-    serializer = CourseActivateSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
+        serializer = CourseActivateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-    activate = serializer.validated_data['activo']
+        activate = serializer.validated_data['activo']
 
-    if activate:
-        course.activate()
-    else:
-        course.deactivate()
+        if activate:
+            course.activate()
+        else:
+            course.deactivate()
 
-    return Response(
+        return Response(
         CourseSerializer(course).data
-    )
+            )
 
 
-@action(detail=True, methods=['patch'])
-def restore(self, request, pk=None):
+    @action(detail=True, methods=['patch'])
+    def restore(self, request, pk=None):
 
-    course = self.get_object()
+        course = self.get_object()
 
-    course.archivado = False
-    course.save(update_fields=['archivado'])
+        course.archivado = False
+        course.save(update_fields=['archivado'])
 
-    return Response(
+        return Response(
         CourseSerializer(course).data
-    )
+            )
 
     @action(detail=True, methods=['get'])
     def registrations(self, request, pk=None):

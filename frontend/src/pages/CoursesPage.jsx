@@ -136,10 +136,32 @@ export default function CoursesPage() {
   // ── TOGGLE ACTIVE ──
   const handleToggleActive = async (course) => {
     try {
-      const { data } = await coursesAPI.toggleActive(course.id, !course.activo);
-      setCourses(prev => prev.map(c => ({ ...c, activo: c.id === data.id ? data.activo : false })));
-      if (selectedCourse?.id === course.id) setSelectedCourse(data);
-    } catch { setError('Error al cambiar el estado.'); }
+      const { data } = await coursesAPI.toggleActive(
+        course.id,
+        !course.activo
+     );
+
+      setCourses(prev =>
+        prev.map(c => ({
+          ...c,
+         activo: c.id === data.id ? data.activo : false
+        }))
+     );
+
+      if (selectedCourse?.id === course.id) {
+        setSelectedCourse(data);
+     }
+
+    } catch (err) {
+      console.error(err);
+      console.error(err.response?.data);
+
+      setError(
+       err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        'Error al cambiar el estado.'
+      );
+    }
   };
 
   // ── CREATE FIELD ──
@@ -235,8 +257,15 @@ export default function CoursesPage() {
   };
 
   const needsOptions = (tipo) => ['select', 'radio', 'checkbox'].includes(tipo);
-  const activeCourse = courses.find(c => c.activo);
+  const activeCourses =
+  courses.filter(c => !c.archivado);
 
+  const archivedCourses =
+  courses.filter(c => c.archivado);
+
+  const activeCourse =
+  courses.find(c => c.activo);
+  
   return (
     <DashboardLayout title="Plantillas de Curso">
       {error && (
@@ -266,7 +295,7 @@ export default function CoursesPage() {
           ) : courses.length === 0 ? (
             <p style={styles.empty}>No tienes plantillas. Crea la primera.</p>
           ) : (
-            courses.map(c => (
+            activeCourses(c => (
               <div
                 key={c.id}
                 style={{
@@ -301,6 +330,44 @@ export default function CoursesPage() {
               </div>
             ))
           )}
+
+          {archivedCourses.length > 0 && (
+  <>
+    <h4
+      style={{
+        color: '#fff',
+        marginTop: 24,
+        marginBottom: 12
+      }}
+    >
+      Plantillas Archivadas
+    </h4>
+
+    {archivedCourses.map(course => (
+      <div
+        key={course.id}
+        style={{
+          ...styles.courseItem,
+          opacity: 0.6
+        }}
+      >
+        <div style={{ color: '#fff', marginBottom: 10 }}>
+          {course.titulo}
+        </div>
+
+        <button
+          style={styles.btnPrimary}
+          onClick={async () => {
+            await coursesAPI.restore(course.id);
+            await loadCourses();
+          }}
+        >
+          Restaurar
+        </button>
+      </div>
+    ))}
+  </>
+)}
 
           {activeCourse && (
             <div style={styles.activeInfo}>
