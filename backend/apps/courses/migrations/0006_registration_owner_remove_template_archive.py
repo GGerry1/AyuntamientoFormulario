@@ -18,6 +18,9 @@ def preserve_registration_ownership(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # PostgreSQL must commit the data migration before dropping Course.archivado;
+    # otherwise deletes leave pending trigger events that block ALTER TABLE.
+    atomic = False
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
