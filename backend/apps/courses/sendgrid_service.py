@@ -1,4 +1,5 @@
 import base64
+import json
 
 from django.conf import settings
 from sendgrid import SendGridAPIClient
@@ -10,6 +11,22 @@ from sendgrid.helpers.mail import (
     FileType,
     Mail,
 )
+
+
+def _sendgrid_error_message(exc):
+    body = getattr(exc, 'body', None)
+    if isinstance(body, bytes):
+        body = body.decode('utf-8', errors='replace')
+
+    if body:
+        try:
+            errors = json.loads(body).get('errors', [])
+            if errors and errors[0].get('message'):
+                return errors[0]['message']
+        except (TypeError, ValueError, AttributeError):
+            pass
+
+    return str(exc) or 'SendGrid rechazo la solicitud.'
 
 
 def send_email_with_attachment(
@@ -34,7 +51,13 @@ def send_email_with_attachment(
         Disposition('attachment'),
     )
 
-    response = SendGridAPIClient(settings.SENDGRID_API_KEY).send(message)
+    try:
+        response = SendGridAPIClient(settings.SENDGRID_API_KEY).send(message)
+    except Exception as exc:
+        raise RuntimeError(
+            f'Error de SendGrid: {_sendgrid_error_message(exc)}'
+        ) from exc
+
     if not 200 <= response.status_code < 300:
         raise RuntimeError(
             f'SendGrid rechazo el correo con estado {response.status_code}.'

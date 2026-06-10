@@ -48,6 +48,25 @@ class SendGridServiceTests(SimpleTestCase):
                 content_type='application/pdf',
             )
 
+    @patch('apps.courses.sendgrid_service.SendGridAPIClient')
+    def test_reports_sendgrid_api_error_message(self, client_class):
+        error = Exception('HTTP Error 403')
+        error.body = b'{"errors":[{"message":"The from address is not verified"}]}'
+        client_class.return_value.send.side_effect = error
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            'The from address is not verified',
+        ):
+            send_email_with_attachment(
+                to_email='recipient@example.com',
+                subject='Diploma',
+                body='Adjunto diploma.',
+                filename='diploma.pdf',
+                content=b'pdf-content',
+                content_type='application/pdf',
+            )
+
 
 class CourseArchiveFlowTests(APITestCase):
     def setUp(self):

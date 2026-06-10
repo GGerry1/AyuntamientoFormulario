@@ -824,9 +824,8 @@ class SendDiplomaView(APIView):
             )
         except Exception as exc:
             logger.exception(
-                'Error sending diploma for registration %s from %s',
+                'Error sending diploma for registration %s',
                 reg.id,
-                settings.DEFAULT_FROM_EMAIL,
             )
             return Response(
                 {'detail': f'Error al enviar correo: {str(exc)}'},
