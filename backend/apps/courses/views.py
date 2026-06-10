@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Course, CourseFormField, FieldOption, CourseRegistration
+from .notifications import send_registration_confirmation
 from .sendgrid_service import send_email_with_attachment
 from .serializers import (
     CourseSerializer, CourseWriteSerializer, CourseActivateSerializer,
@@ -227,6 +228,13 @@ class PublicInscriptionView(APIView):
         )
         if serializer.is_valid():
             registration = serializer.create_registration(course, request)
+            try:
+                send_registration_confirmation(registration)
+            except Exception:
+                logger.exception(
+                    'Registration %s was created, but its confirmation email failed.',
+                    registration.id,
+                )
             return Response(
                 {'detail': 'Inscripcion exitosa!', 'id': str(registration.id)},
                 status=status.HTTP_201_CREATED

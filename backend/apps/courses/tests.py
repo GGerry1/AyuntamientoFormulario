@@ -9,7 +9,8 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Administrator
 from .models import Course, CourseRegistration, FieldOption
-from .sendgrid_service import send_email_with_attachment
+from .notifications import send_registration_confirmation
+from .sendgrid_service import send_email, send_email_with_attachment
 
 
 @override_settings(
@@ -17,6 +18,19 @@ from .sendgrid_service import send_email_with_attachment
     SENDGRID_API_KEY='test-api-key',
 )
 class SendGridServiceTests(SimpleTestCase):
+    @patch('apps.courses.sendgrid_service.SendGridAPIClient')
+    def test_sends_plain_email_through_web_api(self, client_class):
+        client_class.return_value.send.return_value = Mock(status_code=202)
+
+        response = send_email(
+            to_email='recipient@example.com',
+            subject='Confirmación',
+            body='Inscripción exitosa.',
+        )
+
+        self.assertEqual(response.status_code, 202)
+        client_class.return_value.send.assert_called_once()
+
     @patch('apps.courses.sendgrid_service.SendGridAPIClient')
     def test_sends_attachment_through_web_api(self, client_class):
         client_class.return_value.send.return_value = Mock(status_code=202)
@@ -48,6 +62,25 @@ class SendGridServiceTests(SimpleTestCase):
                 content_type='application/pdf',
             )
 
+
+class RegistrationNotificationTests(SimpleTestCase):
+    @patch('apps.courses.notifications.send_email')
+    def test_confirmation_contains_selected_course_name(self, send_email_mock):
+        registration = Mock(
+            nombre_participante='Gerardo Salinas',
+            email_participante='gerardo@example.com',
+            nombre_curso_snapshot='Ciberseguridad',
+        )
+
+        send_registration_confirmation(registration)
+
+        send_email_mock.assert_called_once()
+        call = send_email_mock.call_args.kwargs
+        self.assertEqual(call['to_email'], 'gerardo@example.com')
+        self.assertIn('Ciberseguridad', call['subject'])
+        self.assertIn('ha sido registrada exitosamente', call['body'])
+        self.assertIn('H. Ayuntamiento de Acapulco de Juárez', call['body'])
+
     @patch('apps.courses.sendgrid_service.SendGridAPIClient')
     def test_reports_sendgrid_api_error_message(self, client_class):
         error = Exception('HTTP Error 403')
@@ -66,6 +99,70 @@ class SendGridServiceTests(SimpleTestCase):
                 content=b'pdf-content',
                 content_type='application/pdf',
             )
+
+
+class PublicRegistrationNotificationFlowTests(APITestCase):
+    def setUp(self):
+        self.admin = Administrator.objects.create_user(email='admin@example.com')
+        self.template = Course.objects.create(
+            administrador=self.admin,
+            titulo='Plantilla de capacitacion',
+            activo=True,
+        )
+        self.name_field = self.template.form_fields.create(
+            label='Nombre',
+            tipo='short_text',
+            campo_clave='nombre',
+            orden=1,
+        )
+        self.email_field = self.template.form_fields.create(
+            label='Correo',
+            tipo='email',
+            campo_clave='correo',
+            orden=2,
+        )
+        self.course_field = self.template.form_fields.create(
+            label='Curso',
+            tipo='select',
+            campo_clave='nombre_curso',
+            orden=3,
+        )
+        self.url = reverse(
+            'public-inscription',
+            kwargs={'qr_token': self.admin.qr_token},
+        )
+        self.payload = {
+            'answers': [
+                {'field_id': str(self.name_field.id), 'value': 'Ana Perez'},
+                {'field_id': str(self.email_field.id), 'value': 'ana@gmail.com'},
+                {
+                    'field_id': str(self.course_field.id),
+                    'value': 'Proteccion Civil',
+                },
+            ],
+        }
+
+    @patch('apps.courses.views.send_registration_confirmation')
+    def test_sends_confirmation_after_registration(self, confirmation_mock):
+        response = self.client.post(self.url, self.payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        registration = CourseRegistration.objects.get()
+        self.assertEqual(
+            registration.nombre_curso_snapshot,
+            'Proteccion Civil',
+        )
+        confirmation_mock.assert_called_once_with(registration)
+
+    @patch(
+        'apps.courses.views.send_registration_confirmation',
+        side_effect=RuntimeError('SendGrid unavailable'),
+    )
+    def test_email_failure_does_not_cancel_registration(self, _confirmation_mock):
+        response = self.client.post(self.url, self.payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(CourseRegistration.objects.count(), 1)
 
 
 class CourseArchiveFlowTests(APITestCase):

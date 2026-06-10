@@ -38,19 +38,30 @@ def send_email_with_attachment(
     content,
     content_type,
 ):
-    message = Mail(
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to_emails=to_email,
-        subject=subject,
-        plain_text_content=body,
-    )
+    message = _build_message(to_email, subject, body)
     message.attachment = Attachment(
         FileContent(base64.b64encode(content).decode('ascii')),
         FileName(filename),
         FileType(content_type),
         Disposition('attachment'),
     )
+    return _send_message(message)
 
+
+def send_email(*, to_email, subject, body):
+    return _send_message(_build_message(to_email, subject, body))
+
+
+def _build_message(to_email, subject, body):
+    return Mail(
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=body,
+    )
+
+
+def _send_message(message):
     try:
         response = SendGridAPIClient(settings.SENDGRID_API_KEY).send(message)
     except Exception as exc:
