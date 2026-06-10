@@ -1,14 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.utils import timezone
 
 from apps.accounts.models import Administrator
-from apps.courses.models import (
-    Course,
-    CourseRegistration,
-    FieldOption,
-    RegistrationAnswer,
-)
+from apps.courses.models import Course, FieldOption
 from apps.courses.views import create_default_fields
 
 
@@ -45,40 +39,26 @@ DEMO_TEMPLATES = [
     },
 ]
 
-PARTICIPANTS = [
-    {
-        'nombre': 'Participante Demo Uno',
-        'sexo': 'Mujer',
-        'puesto': 'Administrativo',
-        'tipo_empleado': 'Confianza',
-        'nivel_estudios': 'Licenciatura',
-        'completado': True,
-    },
-    {
-        'nombre': 'Participante Demo Dos',
-        'sexo': 'Hombre',
-        'puesto': 'Operativo',
-        'tipo_empleado': 'Sindicalizado',
-        'nivel_estudios': 'Preparatoria',
-        'completado': False,
-    },
-]
-
-
 class Command(BaseCommand):
-    help = 'Crea 3 plantillas demo con 3 cursos y 2 inscritos ficticios por curso.'
+    help = 'Crea 3 plantillas demo con 3 opciones de curso en cada una.'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--admin-email',
             help='Correo del administrador propietario de los datos demo.',
         )
+        parser.add_argument(
+            '--admin-name',
+            help='Nombre del administrador propietario de los datos demo.',
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
-        admin = self._get_admin(options.get('admin_email'))
+        admin = self._get_admin(
+            email=options.get('admin_email'),
+            name=options.get('admin_name'),
+        )
         created_templates = 0
-        created_registrations = 0
 
         for template_data in DEMO_TEMPLATES:
             template, created = Course.objects.get_or_create(
@@ -96,48 +76,12 @@ class Command(BaseCommand):
 
             self._add_course_options(template, template_data['courses'])
 
-            for course_index, course_name in enumerate(template_data['courses']):
-                for participant_index, participant in enumerate(PARTICIPANTS):
-                    email = (
-                        f"demo.{template_data['titulo'].split()[-1].lower()}."
-                        f"{course_index + 1}.{participant_index + 1}@example.com"
-                    )
-                    registration, registration_created = (
-                        CourseRegistration.objects.get_or_create(
-                            administrador=admin,
-                            course=template,
-                            email_participante=email,
-                            nombre_curso_snapshot=course_name,
-                            defaults={
-                                'nombre_participante': participant['nombre'],
-                                'completado': participant['completado'],
-                                'fecha_completado': (
-                                    timezone.now()
-                                    if participant['completado']
-                                    else None
-                                ),
-                            },
-                        )
-                    )
-                    if registration_created:
-                        self._create_answers(
-                            registration,
-                            template,
-                            course_name,
-                            participant,
-                            email,
-                            course_index,
-                            participant_index,
-                        )
-                        created_registrations += 1
-
         self.stdout.write(self.style.SUCCESS(
             f'Datos demo listos para {admin.email}: '
-            f'{created_templates} plantillas y '
-            f'{created_registrations} inscripciones nuevas.'
+            f'{created_templates} plantillas nuevas, sin inscripciones.'
         ))
 
-    def _get_admin(self, email):
+    def _get_admin(self, email=None, name=None):
         admins = Administrator.objects.filter(activo=True).order_by('fecha_creacion')
         if email:
             try:
@@ -146,6 +90,18 @@ class Command(BaseCommand):
                 raise CommandError(
                     f'No existe un administrador activo con correo {email}.'
                 ) from exc
+        if name:
+            matches = admins.filter(nombre__iexact=name)
+            if matches.count() == 1:
+                return matches.first()
+            if not matches.exists():
+                raise CommandError(
+                    f'No existe un administrador activo con nombre {name}.'
+                )
+            raise CommandError(
+                f'Hay varios administradores activos con nombre {name}. '
+                'Usa --admin-email.'
+            )
 
         count = admins.count()
         if count == 1:
@@ -153,7 +109,7 @@ class Command(BaseCommand):
         if count == 0:
             raise CommandError('No existe ningun administrador activo.')
         raise CommandError(
-            'Hay varios administradores. Ejecuta el comando con --admin-email.'
+            'Hay varios administradores. Usa --admin-email o --admin-name.'
         )
 
     def _add_course_options(self, template, course_names):
@@ -165,41 +121,4 @@ class Command(BaseCommand):
                 field=field,
                 valor=course_name,
                 defaults={'etiqueta': course_name, 'orden': index},
-            )
-
-    def _create_answers(
-        self,
-        registration,
-        template,
-        course_name,
-        participant,
-        email,
-        course_index,
-        participant_index,
-    ):
-        values = {
-            'nombre_curso': course_name,
-            'nombre': participant['nombre'],
-            'correo': email,
-            'sexo': participant['sexo'],
-            'edad': str(28 + course_index + participant_index),
-            'telefono': f'744000{course_index + 1:02d}{participant_index + 1:02d}',
-            'numero_empleado': f'90{course_index + 1:02d}{participant_index + 1:02d}',
-            'puesto': participant['puesto'],
-            'tipo_empleado': participant['tipo_empleado'],
-            'nivel_estudios': participant['nivel_estudios'],
-            'antiguedad': str(3 + course_index + participant_index),
-        }
-        fields = {
-            field.campo_clave: field
-            for field in template.form_fields.exclude(campo_clave='')
-        }
-        for key, value in values.items():
-            field = fields.get(key)
-            RegistrationAnswer.objects.create(
-                registration=registration,
-                field=field,
-                campo_label_snapshot=field.label if field else key,
-                campo_clave_snapshot=key,
-                valor_texto=value,
             )

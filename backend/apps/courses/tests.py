@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Administrator
-from .models import Course, CourseRegistration
+from .models import Course, CourseRegistration, FieldOption
 
 
 class CourseArchiveFlowTests(APITestCase):
@@ -111,15 +111,17 @@ class CourseArchiveFlowTests(APITestCase):
         self.assertFalse(self.registration.completado)
 
     def test_demo_seed_command_is_idempotent(self):
+        self.admin.nombre = 'Gerardo Salinas'
+        self.admin.save(update_fields=['nombre'])
         output = StringIO()
         call_command(
             'seed_demo_courses',
-            admin_email=self.admin.email,
+            admin_name='Gerardo Salinas',
             stdout=output,
         )
         call_command(
             'seed_demo_courses',
-            admin_email=self.admin.email,
+            admin_name='Gerardo Salinas',
             stdout=output,
         )
 
@@ -131,10 +133,11 @@ class CourseArchiveFlowTests(APITestCase):
             administrador=self.admin,
             course__in=demo_templates,
         )
+        demo_course_options = FieldOption.objects.filter(
+            field__course__in=demo_templates,
+            field__campo_clave='nombre_curso',
+        ).exclude(valor='Otro')
 
         self.assertEqual(demo_templates.count(), 3)
-        self.assertEqual(demo_registrations.count(), 18)
-        self.assertEqual(
-            demo_registrations.values('nombre_curso_snapshot').distinct().count(),
-            9,
-        )
+        self.assertEqual(demo_registrations.count(), 0)
+        self.assertEqual(demo_course_options.count(), 9)
