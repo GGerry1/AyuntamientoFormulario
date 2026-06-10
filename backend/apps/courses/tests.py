@@ -1,3 +1,6 @@
+from io import StringIO
+
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -106,3 +109,32 @@ class CourseArchiveFlowTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.registration.refresh_from_db()
         self.assertFalse(self.registration.completado)
+
+    def test_demo_seed_command_is_idempotent(self):
+        output = StringIO()
+        call_command(
+            'seed_demo_courses',
+            admin_email=self.admin.email,
+            stdout=output,
+        )
+        call_command(
+            'seed_demo_courses',
+            admin_email=self.admin.email,
+            stdout=output,
+        )
+
+        demo_templates = Course.objects.filter(
+            administrador=self.admin,
+            titulo__startswith='Plantilla Demo ',
+        )
+        demo_registrations = CourseRegistration.objects.filter(
+            administrador=self.admin,
+            course__in=demo_templates,
+        )
+
+        self.assertEqual(demo_templates.count(), 3)
+        self.assertEqual(demo_registrations.count(), 18)
+        self.assertEqual(
+            demo_registrations.values('nombre_curso_snapshot').distinct().count(),
+            9,
+        )
