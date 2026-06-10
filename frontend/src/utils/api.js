@@ -114,9 +114,7 @@ export const coursesAPI = {
     api.patch(`/courses/registrations/${regId}/toggle-completado/`),
 
   sendDiploma: (regId, formData) =>
-    api.post(`/courses/registrations/${regId}/send-diploma/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    api.post(`/courses/registrations/${regId}/send-diploma/`, formData),
 
 };
 

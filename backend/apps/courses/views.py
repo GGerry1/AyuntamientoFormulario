@@ -6,6 +6,8 @@ Courses Views - Updated
 - Activate/deactivate endpoint
 - Statistics by curso name
 """
+import logging
+
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Count, Q
@@ -25,6 +27,7 @@ from .serializers import (
 )
 
 MAX_PLANTILLAS = 10
+logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────
 # DEFAULT BASE FIELDS DEFINITION
@@ -823,9 +826,14 @@ class SendDiplomaView(APIView):
 
         try:
             email.send(fail_silently=False)
-        except Exception as e:
+        except Exception as exc:
+            logger.exception(
+                'Error sending diploma for registration %s from %s',
+                reg.id,
+                settings.DEFAULT_FROM_EMAIL,
+            )
             return Response(
-                {'detail': f'Error al enviar correo: {str(e)}'},
+                {'detail': f'Error al enviar correo: {str(exc)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

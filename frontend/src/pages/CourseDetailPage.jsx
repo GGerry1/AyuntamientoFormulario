@@ -258,7 +258,16 @@ function DiplomaModal({ reg, onClose, onSent }) {
       await coursesAPI.sendDiploma(reg.regId, fd);
       onSent(reg.regId);
     } catch (e) {
-      setError(e?.response?.data?.detail || 'Error al enviar. Verifica la configuracion de correo.');
+      const serverDetail = e?.response?.data?.detail;
+      const networkDetail = e?.request && !e?.response
+        ? 'El servidor no respondio. Revisa los logs de Render.'
+        : '';
+      setError(
+        serverDetail ||
+        networkDetail ||
+        e?.message ||
+        'Error al enviar. Verifica la configuracion de correo.'
+      );
     } finally {
       setSending(false);
     }
