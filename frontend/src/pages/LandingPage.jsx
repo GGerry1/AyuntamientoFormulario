@@ -2,15 +2,18 @@
  * LandingPage — Paleta institucional Acapulco
  * v4: footer completo con direccion, telefono, emergencias
  */
+import {
+  InstitutionalHeader,
+  institutionalCss,
+} from '../components/public/InstitutionalLayout';
+
 export default function LandingPage() {
   return (
     <div style={styles.page}>
       <style>{css}</style>
 
       {/* NAV */}
-      <nav style={styles.nav}>
-        <img src="/logo-acapulco.png" alt="Acapulco 2024-2027" style={styles.logoImg} />
-      </nav>
+      <InstitutionalHeader />
 
       {/* HERO */}
       <section style={styles.heroSection}>
@@ -101,6 +104,7 @@ export default function LandingPage() {
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=DM+Sans:wght@400;500;600;700&display=swap');
+  ${institutionalCss}
   * { box-sizing: border-box; }
   .fade-up { animation: fadeUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
   @keyframes fadeUp {
@@ -205,7 +209,12 @@ const styles = {
     justifyContent: 'space-between', gap: 48, marginBottom: 40, flexWrap: 'wrap',
   },
   footerCol: { display: 'flex', flexDirection: 'column', gap: 4 },
-  footerLogo: { height: 46, width: 'auto', opacity: 0.75, filter: 'drop-shadow(0 2px 6px rgba(184,149,42,0.15))', marginBottom: 10 },
+  footerLogo: {
+    display: 'block', width: 220, height: 54,
+    objectFit: 'contain', objectPosition: 'left center',
+    opacity: 0.75, filter: 'drop-shadow(0 2px 6px rgba(184,149,42,0.15))',
+    marginBottom: 10,
+  },
   footerName: { fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.8)', marginBottom: 2 },
   footerMeta: { fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.8 },
 

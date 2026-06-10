@@ -127,6 +127,20 @@ class PublicRegistrationNotificationFlowTests(APITestCase):
             campo_clave='nombre_curso',
             orden=3,
         )
+        self.phone_field = self.template.form_fields.create(
+            label='Numero de Telefono',
+            tipo='number',
+            campo_clave='telefono',
+            validacion={'exact_digits': 10, 'max_digits': 10},
+            orden=4,
+        )
+        self.employee_field = self.template.form_fields.create(
+            label='Numero de Empleado',
+            tipo='number',
+            campo_clave='numero_empleado',
+            validacion={'exact_digits': 10, 'max_digits': 10},
+            orden=5,
+        )
         self.url = reverse(
             'public-inscription',
             kwargs={'qr_token': self.admin.qr_token},
@@ -139,6 +153,8 @@ class PublicRegistrationNotificationFlowTests(APITestCase):
                     'field_id': str(self.course_field.id),
                     'value': 'Proteccion Civil',
                 },
+                {'field_id': str(self.phone_field.id), 'value': '7441234567'},
+                {'field_id': str(self.employee_field.id), 'value': '0000123456'},
             ],
         }
 
@@ -163,6 +179,29 @@ class PublicRegistrationNotificationFlowTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(CourseRegistration.objects.count(), 1)
+
+    @patch('apps.courses.views.send_registration_confirmation')
+    def test_rejects_phone_or_employee_number_without_ten_digits(
+        self,
+        confirmation_mock,
+    ):
+        self.payload['answers'][-2]['value'] = '744123'
+
+        response = self.client.post(self.url, self.payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('exactamente 10 digitos', str(response.data))
+        self.assertEqual(CourseRegistration.objects.count(), 0)
+        confirmation_mock.assert_not_called()
+
+        self.payload['answers'][-2]['value'] = '7441234567'
+        self.payload['answers'][-1]['value'] = '123'
+        response = self.client.post(self.url, self.payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('exactamente 10 digitos', str(response.data))
+        self.assertEqual(CourseRegistration.objects.count(), 0)
+        confirmation_mock.assert_not_called()
 
 
 class CourseArchiveFlowTests(APITestCase):

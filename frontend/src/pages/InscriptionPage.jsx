@@ -6,6 +6,11 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { publicAPI } from '../utils/api';
 import DynamicFormRenderer from '../components/forms/DynamicFormRenderer';
+import {
+  InstitutionalFooter,
+  InstitutionalHeader,
+  institutionalCss,
+} from '../components/public/InstitutionalLayout';
 
 export default function InscriptionPage() {
   const { token } = useParams();
@@ -34,10 +39,19 @@ export default function InscriptionPage() {
   const validate = () => {
     const errors = {};
     course.fields.forEach((f) => {
-      if (!f.obligatorio) return;
       const val = values[f.id];
-      if (val === undefined || val === '' || (Array.isArray(val) && val.length === 0)) {
+      const isEmpty = (
+        val === undefined ||
+        val === '' ||
+        (Array.isArray(val) && val.length === 0)
+      );
+      if (f.obligatorio && isEmpty) {
         errors[f.id] = 'Este campo es obligatorio.';
+        return;
+      }
+      const exactDigits = f.validacion?.exact_digits;
+      if (!isEmpty && exactDigits && String(val).length !== exactDigits) {
+        errors[f.id] = `Este campo debe contener exactamente ${exactDigits} digitos.`;
       }
     });
     return errors;
@@ -204,8 +218,13 @@ export default function InscriptionPage() {
 function Page({ children }) {
   return (
     <div style={styles.page}>
-      <div style={styles.pageInner}>{children}</div>
+      <InstitutionalHeader />
+      <main style={styles.pageMain}>
+        <div style={styles.pageInner}>{children}</div>
+      </main>
+      <InstitutionalFooter />
       <style>{`
+        ${institutionalCss}
         * { box-sizing: border-box; }
         body { margin: 0; }
         input:focus, select:focus, textarea:focus {
@@ -230,9 +249,13 @@ function Loading() {
 const styles = {
   page: {
     minHeight: '100vh',
-    background: 'linear-gradient(160deg, #f0efff 0%, #f7f8fc 60%, #eef5ff 100%)',
-    padding: '40px 20px',
+    background: 'linear-gradient(160deg, #0f0a08 0%, #1a0e0b 50%, #120808 100%)',
     fontFamily: '"DM Sans", system-ui, sans-serif',
+  },
+  pageMain: {
+    minHeight: 'calc(100vh - 93px)',
+    padding: '56px 20px 72px',
+    background: 'linear-gradient(160deg, #0f0a08 0%, #1a0e0b 50%, #120808 100%)',
   },
   pageInner: { maxWidth: 640, margin: '0 auto' },
   card: {

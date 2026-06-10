@@ -44,18 +44,6 @@ DEFAULT_FIELDS = [
         'es_campo_base': True,
         'campo_clave': 'nombre_curso',
         'validacion': None,
-        'options': [
-            {'valor': 'Otro', 'etiqueta': 'Otro', 'orden': 99},
-        ],
-    },
-    {
-        'label': 'En caso de seleccionar "Otro", especifique el nombre del curso',
-        'tipo': 'long_text',
-        'obligatorio': False,
-        'orden': 2,
-        'es_campo_base': True,
-        'campo_clave': 'nombre_curso_otro',
-        'validacion': None,
         'options': [],
     },
     {
@@ -108,7 +96,7 @@ DEFAULT_FIELDS = [
         'orden': 7,
         'es_campo_base': True,
         'campo_clave': 'telefono',
-        'validacion': {'max_digits': 10},
+        'validacion': {'exact_digits': 10, 'max_digits': 10},
         'options': [],
     },
     {
@@ -118,7 +106,7 @@ DEFAULT_FIELDS = [
         'orden': 8,
         'es_campo_base': True,
         'campo_clave': 'numero_empleado',
-        'validacion': None,
+        'validacion': {'exact_digits': 10, 'max_digits': 10},
         'options': [],
     },
     {

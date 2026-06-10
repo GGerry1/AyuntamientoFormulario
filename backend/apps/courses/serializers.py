@@ -206,6 +206,13 @@ class RegistrationSubmitSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     f"El campo '{field.label}' debe ser un numero."
                 )
+            if field.validacion and 'exact_digits' in field.validacion:
+                exact_d = field.validacion['exact_digits']
+                if len(val_str) != exact_d:
+                    raise serializers.ValidationError(
+                        f"El campo '{field.label}' debe contener exactamente "
+                        f"{exact_d} digitos."
+                    )
             # Validate max_digits from validacion config
             if field.validacion and 'max_digits' in field.validacion:
                 max_d = field.validacion['max_digits']

@@ -127,14 +127,20 @@ function FieldInput({ field, value, onChange }) {
   // Number: only allow digits, enforce max_digits
   if (tipo === 'number') {
     const maxDigits = field.validacion?.max_digits || null;
+    const exactDigits = field.validacion?.exact_digits || null;
     return (
       <input
         type="text"
         inputMode="numeric"
         style={styles.input}
         value={value}
-        placeholder={placeholder || (maxDigits ? `Max ${maxDigits} digitos` : '')}
-        maxLength={maxDigits || undefined}
+        placeholder={
+          placeholder ||
+          (exactDigits
+            ? `${exactDigits} digitos obligatorios`
+            : maxDigits ? `Max ${maxDigits} digitos` : '')
+        }
+        maxLength={exactDigits || maxDigits || undefined}
         onKeyDown={(e) => {
           const allowed = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
           if (allowed.includes(e.key)) return;
