@@ -125,6 +125,7 @@ class CourseRegistration(models.Model):
     nombre_participante = models.CharField(max_length=200, blank=True)
     # Snapshot: preserves course name even after course is deleted
     nombre_curso_snapshot = models.CharField(max_length=300, blank=True)
+    curso_archivado = models.BooleanField(default=False)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     fecha_inscripcion = models.DateTimeField(auto_now_add=True)
     completado = models.BooleanField(default=False)

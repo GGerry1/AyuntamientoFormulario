@@ -236,9 +236,10 @@ class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-     return Course.objects.filter(
-        administrador=self.request.user
-    )
+        return Course.objects.filter(
+                administrador=self.request.user,
+                archivado=False
+                )
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
@@ -284,9 +285,11 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         if course.archivado:
             return Response(
-                {'detail': 'No puedes activar una plantilla archivada.'
-            },
-            status=status.HTTP_400_BAD_REQUEST
+        {
+            "detail":
+            "No se puede activar un curso archivado."
+        },
+        status=400
             )
 
         serializer = CourseActivateSerializer(data=request.data)
@@ -345,6 +348,32 @@ class CourseViewSet(viewsets.ModelViewSet):
                  .distinct()
                  .exclude(nombre_curso_snapshot=''))
         return Response(list(names))
+    
+
+    @action(detail=True, methods=['patch'])
+    def archive(self, request, pk=None):
+        course = self.get_object()
+
+        course.archivado = True
+        course.activo = False
+
+        course.save()
+
+        return Response(
+        CourseSerializer(course).data
+    )
+
+    @action(detail=True, methods=['patch'])
+    def restore(self, request, pk=None):
+        course = self.get_object()
+
+        course.archivado = False
+
+        course.save()
+
+        return Response(
+        CourseSerializer(course).data
+    )
 
 
 # ─────────────────────────────────────────────
@@ -427,12 +456,11 @@ class AdminStatisticsView(APIView):
         # Group by value and count
         from collections import defaultdict
         course_counts = defaultdict(int)
+
         for reg in qs:
-            for answer in reg.answers.all():
-                if answer.campo_clave_snapshot == 'nombre_curso' and answer.valor_texto:
-                    nombre = answer.valor_texto.strip()
-                    if nombre and nombre.lower() != 'otro':
-                        course_counts[nombre] += 1
+
+            if reg.curso_archivado:
+                continue
 
         stats['cursos_lista'] = [
             {'nombre': nombre, 'total': count}
@@ -686,6 +714,19 @@ class RegistrationsByCourseNameView(APIView):
         deleted_count, _ = CourseRegistration.objects.filter(id__in=to_delete).delete()
         return Response({'deleted': deleted_count})
 
+
+    def patch(self, request, nombre_curso):
+
+        CourseRegistration.objects.filter(
+        nombre_curso_snapshot=nombre_curso,
+        course__administrador=request.user
+    ).update(
+        curso_archivado=True
+    )
+
+        return Response({
+        'detail': 'Curso archivado'
+    })
 
 # ─────────────────────────────────────────────
 # TOGGLE COMPLETADO

@@ -16,6 +16,7 @@ import ConfigPage from './pages/ConfigPage';
 import InscriptionPage from './pages/InscriptionPage';
 import CourseStatsPage from './pages/CourseStatsPage';
 import PublicReportPage from './pages/PublicReportPage';
+import ArchivedCoursesPage from './pages/ArchivedCoursesPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -66,6 +67,12 @@ export default function App() {
           <Route path="/configuracion" element={
             <ProtectedRoute><ConfigPage /></ProtectedRoute>
           } />
+
+          <Route path="/cursos-archivados" element={
+            <ProtectedRoute>
+            <ArchivedCoursesPage />
+            </ProtectedRoute>
+          }/>
 
           <Route path="/inscritos" element={
             <ProtectedRoute><CourseDetailPage /></ProtectedRoute>
