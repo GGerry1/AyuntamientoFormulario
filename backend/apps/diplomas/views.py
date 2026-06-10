@@ -1,14 +1,13 @@
 """Diplomas Views"""
 import os
 from django.utils import timezone
-from django.core.mail import EmailMessage
-from django.conf import settings
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from apps.courses.models import CourseRegistration
+from apps.courses.sendgrid_service import send_email_with_attachment
 from .models import Diploma
 
 
@@ -100,20 +99,20 @@ Atentamente,
 {course.instructores or course.administrador.display_name}
             """.strip()
 
-            email = EmailMessage(
+            diploma.archivo.open()
+            try:
+                content = diploma.archivo.read()
+            finally:
+                diploma.archivo.close()
+
+            send_email_with_attachment(
+                to_email=registration.email_participante,
                 subject=subject,
                 body=body,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[registration.email_participante],
-            )
-            diploma.archivo.open()
-            email.attach(
                 filename=f'diploma_{course.titulo}.{diploma.tipo_archivo}',
-                content=diploma.archivo.read(),
-                mimetype=self._get_mimetype(diploma.tipo_archivo),
+                content=content,
+                content_type=self._get_mimetype(diploma.tipo_archivo),
             )
-            diploma.archivo.close()
-            email.send(fail_silently=False)
             return True, None
         except Exception as e:
             return False, e

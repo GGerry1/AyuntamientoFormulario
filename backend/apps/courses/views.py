@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Course, CourseFormField, FieldOption, CourseRegistration
+from .sendgrid_service import send_email_with_attachment
 from .serializers import (
     CourseSerializer, CourseWriteSerializer, CourseActivateSerializer,
     CourseFormFieldSerializer, CourseFormFieldWriteSerializer,
@@ -797,9 +798,6 @@ class SendDiplomaView(APIView):
             curso_nombre = answers_curso.first().valor_texto or curso_nombre
 
         # Build email
-        from django.core.mail import EmailMessage
-        from django.conf import settings
-
         subject = f'Constancia de participacion — {curso_nombre}'
         body = (
             f'Estimado/a {nombre_part},\n\n'
@@ -809,23 +807,21 @@ class SendDiplomaView(APIView):
             f'2024 - 2027'
         )
 
-        email = EmailMessage(
-            subject=subject,
-            body=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[reg.email_participante],
-        )
-
         content_types = {
             'pdf':  'application/pdf',
             'jpg':  'image/jpeg',
             'jpeg': 'image/jpeg',
             'png':  'image/png',
         }
-        email.attach(archivo.name, archivo.read(), content_types.get(ext, 'application/octet-stream'))
-
         try:
-            email.send(fail_silently=False)
+            send_email_with_attachment(
+                to_email=reg.email_participante,
+                subject=subject,
+                body=body,
+                filename=archivo.name,
+                content=archivo.read(),
+                content_type=content_types.get(ext, 'application/octet-stream'),
+            )
         except Exception as exc:
             logger.exception(
                 'Error sending diploma for registration %s from %s',

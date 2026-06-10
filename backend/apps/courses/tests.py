@@ -1,12 +1,52 @@
 from io import StringIO
+from unittest.mock import Mock, patch
 
 from django.core.management import call_command
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Administrator
 from .models import Course, CourseRegistration, FieldOption
+from .sendgrid_service import send_email_with_attachment
+
+
+@override_settings(
+    DEFAULT_FROM_EMAIL='verified@example.com',
+    SENDGRID_API_KEY='test-api-key',
+)
+class SendGridServiceTests(SimpleTestCase):
+    @patch('apps.courses.sendgrid_service.SendGridAPIClient')
+    def test_sends_attachment_through_web_api(self, client_class):
+        client_class.return_value.send.return_value = Mock(status_code=202)
+
+        response = send_email_with_attachment(
+            to_email='recipient@example.com',
+            subject='Diploma',
+            body='Adjunto diploma.',
+            filename='diploma.pdf',
+            content=b'pdf-content',
+            content_type='application/pdf',
+        )
+
+        self.assertEqual(response.status_code, 202)
+        client_class.assert_called_once_with('test-api-key')
+        client_class.return_value.send.assert_called_once()
+
+    @patch('apps.courses.sendgrid_service.SendGridAPIClient')
+    def test_rejects_unsuccessful_sendgrid_response(self, client_class):
+        client_class.return_value.send.return_value = Mock(status_code=400)
+
+        with self.assertRaisesRegex(RuntimeError, 'estado 400'):
+            send_email_with_attachment(
+                to_email='recipient@example.com',
+                subject='Diploma',
+                body='Adjunto diploma.',
+                filename='diploma.pdf',
+                content=b'pdf-content',
+                content_type='application/pdf',
+            )
 
 
 class CourseArchiveFlowTests(APITestCase):

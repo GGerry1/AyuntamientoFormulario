@@ -89,11 +89,6 @@ class OAuthSuccessView(View):
     def get(self, request):
         from django.conf import settings
 
-        print("===== OAUTH SUCCESS =====")
-        print("USER:", request.user)
-        print("AUTH:", request.user.is_authenticated)
-        print("SITE_BASE_URL:", settings.SITE_BASE_URL)
-
         if not request.user.is_authenticated:
             return django_redirect(
                 f"{settings.SITE_BASE_URL}/admin?error=auth_failed"
@@ -108,7 +103,5 @@ class OAuthSuccessView(View):
             f"{settings.SITE_BASE_URL}/auth/callback"
             f"?access={access}&refresh={ref}"
         )
-
-        print("REDIRECT URL:", redirect_url)
 
         return django_redirect(redirect_url)
