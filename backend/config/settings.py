@@ -216,7 +216,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'apikey'
 EMAIL_HOST_PASSWORD = config('SENDGRID_API_KEY')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@tusitio.com')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='jsc.designx@gmail.com')
 
 # ─────────────────────────────────────────────
 # CELERY
