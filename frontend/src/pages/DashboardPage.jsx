@@ -41,7 +41,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div style={styles.warnBadge}>
-              Sin plantilla activa — activa una desde "Cursos"
+              Sin plantilla activa — activa una desde "Plantillas"
             </div>
           )}
 

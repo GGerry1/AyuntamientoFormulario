@@ -29,7 +29,11 @@ class DiplomaUploadView(APIView):
         try:
             registration = CourseRegistration.objects.select_related(
                 'course__administrador', 'diploma'
-            ).get(id=registration_pk, course__administrador=request.user)
+            ).get(
+                id=registration_pk,
+                administrador=request.user,
+                curso_archivado=False,
+            )
         except CourseRegistration.DoesNotExist:
             return Response({'detail': 'Inscripción no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 

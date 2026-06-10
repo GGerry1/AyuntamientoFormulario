@@ -95,13 +95,20 @@ export const coursesAPI = {
   },
   courseNames: (id) => api.get(`/courses/${id}/course_names/`),
   adminStats: () => api.get('/courses/admin-stats/'),
-  statsByName: (nombre) => api.get(`/courses/stats-by-name/${encodeURIComponent(nombre)}/`),
+  statsByName: (nombre, archived = false) =>
+    api.get(`/courses/stats-by-name/${encodeURIComponent(nombre)}/`, {
+      params: archived ? { archived: 1 } : {},
+    }),
   publicReportByName: (nombre) => `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/courses/public-report-name/${encodeURIComponent(nombre)}/`,
-  deleteRegistrationsByCourse: (nombreCurso) =>
-    api.delete(`/courses/registrations-by-course/${encodeURIComponent(nombreCurso)}/`),
-
   registrationsByCourse: (nombreCurso) =>
     api.get(`/courses/registrations-by-course/${encodeURIComponent(nombreCurso)}/`),
+  archiveCourse: (nombreCurso) =>
+    api.patch(`/courses/registrations-by-course/${encodeURIComponent(nombreCurso)}/`),
+  archivedCourses: () => api.get('/courses/archived-courses/'),
+  archivedRegistrations: (nombreCurso) =>
+    api.get(`/courses/archived-courses/${encodeURIComponent(nombreCurso)}/`),
+  deleteArchivedCourse: (nombreCurso) =>
+    api.delete(`/courses/archived-courses/${encodeURIComponent(nombreCurso)}/`),
 
   toggleCompletado: (regId) =>
     api.patch(`/courses/registrations/${regId}/toggle-completado/`),

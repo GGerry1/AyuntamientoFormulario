@@ -7,8 +7,9 @@ import { useAuth } from '../../hooks/useAuth';
 
 const NAV = [
   { to: '/dashboard',     icon: '⌂', label: 'Inicio'         },
-  { to: '/cursos',        icon: '◧', label: 'Cursos'          },
-  { to: '/inscritos',     icon: '◑', label: 'Inscritos'       },
+  { to: '/plantillas',     icon: '◧', label: 'Plantillas'      },
+  { to: '/cursos',         icon: '◑', label: 'Cursos'          },
+  { to: '/cursos-archivados', icon: '◫', label: 'Cursos Archivados' },
   { to: '/estadisticas',  icon: '◉', label: 'Estadisticas'    },
   { to: '/configuracion', icon: '◈', label: 'Configuracion'   },
 ];

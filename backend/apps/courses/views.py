@@ -7,6 +7,8 @@ Courses Views - Updated
 - Statistics by curso name
 """
 from django.shortcuts import get_object_or_404
+from django.db import transaction
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status, generics, parsers
 from rest_framework.decorators import action
@@ -236,10 +238,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Course.objects.filter(
-                administrador=self.request.user,
-                archivado=False
-                )
+        return Course.objects.filter(administrador=self.request.user)
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
@@ -248,7 +247,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         # Enforce max 10 plantillas
-        count = Course.objects.filter(administrador=request.user).count()
+        count = self.get_queryset().count()
         if count >= MAX_PLANTILLAS:
             return Response(
                 {'detail': f'Has alcanzado el limite de {MAX_PLANTILLAS} plantillas.'},
@@ -263,34 +262,20 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         course = self.get_object()
-
-        course.archivado = True
-        course.activo = False
-
-        course.save(
-        update_fields=[
-            'archivado',
-            'activo'
-        ]
+        archived_count = course.registrations.update(
+            administrador=request.user,
+            curso_archivado=True,
         )
-
+        course.delete()
         return Response({
-        'detail': 'Plantilla archivada correctamente.'
+            'detail': 'Plantilla eliminada correctamente.',
+            'inscripciones_archivadas': archived_count,
         })
 
     @action(detail=True, methods=['patch'])
     def toggle_active(self, request, pk=None):
 
         course = self.get_object()
-
-        if course.archivado:
-            return Response(
-        {
-            "detail":
-            "No se puede activar un curso archivado."
-        },
-        status=400
-            )
 
         serializer = CourseActivateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -301,19 +286,6 @@ class CourseViewSet(viewsets.ModelViewSet):
             course.activate()
         else:
             course.deactivate()
-
-        return Response(
-        CourseSerializer(course).data
-            )
-
-
-    @action(detail=True, methods=['patch'])
-    def restore(self, request, pk=None):
-
-        course = self.get_object()
-
-        course.archivado = False
-        course.save(update_fields=['archivado'])
 
         return Response(
         CourseSerializer(course).data
@@ -348,34 +320,6 @@ class CourseViewSet(viewsets.ModelViewSet):
                  .distinct()
                  .exclude(nombre_curso_snapshot=''))
         return Response(list(names))
-    
-
-    @action(detail=True, methods=['patch'])
-    def archive(self, request, pk=None):
-        course = self.get_object()
-
-        course.archivado = True
-        course.activo = False
-
-        course.save()
-
-        return Response(
-        CourseSerializer(course).data
-    )
-
-    @action(detail=True, methods=['patch'])
-    def restore(self, request, pk=None):
-        course = self.get_object()
-
-        course.archivado = False
-
-        course.save()
-
-        return Response(
-        CourseSerializer(course).data
-    )
-
-
 # ─────────────────────────────────────────────
 # ADMIN — FORM FIELDS
 # ─────────────────────────────────────────────
@@ -422,7 +366,8 @@ class RegistrationDetailView(generics.RetrieveUpdateAPIView):
 
     def get_queryset(self):
         return CourseRegistration.objects.filter(
-            course__administrador=self.request.user
+            administrador=self.request.user,
+            curso_archivado=False,
         ).prefetch_related('answers__field')
 
     def patch(self, request, *args, **kwargs):
@@ -447,24 +392,20 @@ class AdminStatisticsView(APIView):
     def get(self, request):
         # All registrations for this admin
         qs = CourseRegistration.objects.filter(
-            course__administrador=request.user
+            administrador=request.user
         ).prefetch_related('answers__field')
 
         stats = _build_admin_statistics(qs)
 
-        # Build course list from RegistrationAnswer campo_clave='nombre_curso'
-        # Group by value and count
-        from collections import defaultdict
-        course_counts = defaultdict(int)
-
-        for reg in qs:
-
-            if reg.curso_archivado:
-                continue
-
         stats['cursos_lista'] = [
-            {'nombre': nombre, 'total': count}
-            for nombre, count in sorted(course_counts.items(), key=lambda x: -x[1])
+            {'nombre': item['nombre_curso_snapshot'], 'total': item['total']}
+            for item in (
+                qs.filter(curso_archivado=False)
+                .exclude(nombre_curso_snapshot='')
+                .values('nombre_curso_snapshot')
+                .annotate(total=Count('id'))
+                .order_by('-total', 'nombre_curso_snapshot')
+            )
         ]
         return Response(stats)
 
@@ -550,20 +491,14 @@ class CourseNameStatsView(APIView):
     def get(self, request, nombre_curso):
         from collections import defaultdict
         # Find all registrations where nombre_curso answer matches
-        admin_courses = Course.objects.filter(administrador=request.user)
         registrations = CourseRegistration.objects.filter(
-            course__in=admin_courses
+            administrador=request.user,
+            nombre_curso_snapshot=nombre_curso,
         ).prefetch_related('answers__field')
-
-        # Filter by nombre_curso answer value
-        matching_ids = []
-        for reg in registrations:
-            for answer in reg.answers.all():
-                if answer.campo_clave_snapshot == 'nombre_curso' and answer.valor_texto.strip() == nombre_curso:
-                    matching_ids.append(reg.id)
-                    break
-
-        qs = registrations.filter(id__in=matching_ids)
+        archived = request.query_params.get('archived')
+        if archived in ('0', '1'):
+            registrations = registrations.filter(curso_archivado=archived == '1')
+        qs = registrations
         total = qs.count()
         completaron = qs.filter(completado=True).count()
 
@@ -670,24 +605,18 @@ class RegistrationsByCourseNameView(APIView):
 
     def get(self, request, nombre_curso):
         nombre = nombre_curso.strip()
-        admin_courses = Course.objects.filter(administrador=request.user)
         registrations = CourseRegistration.objects.filter(
-            course__in=admin_courses
+            administrador=request.user,
+            nombre_curso_snapshot=nombre,
+            curso_archivado=False,
         ).prefetch_related('answers')
 
-        matching = []
-        for reg in registrations:
-            for answer in reg.answers.all():
-                if answer.campo_clave_snapshot == 'nombre_curso' and answer.valor_texto.strip() == nombre:
-                    matching.append(reg)
-                    break
-
         result = []
-        for reg in matching:
+        for reg in registrations:
             answers = {a.campo_clave_snapshot: a.valor_texto for a in reg.answers.all()}
             result.append({
                 'id': str(reg.id),
-                'nombre': answers.get('nombre', ''),
+                'nombre': answers.get('nombre', reg.nombre_participante),
                 'correo': answers.get('correo', reg.email_participante),
                 'telefono': answers.get('telefono', ''),
                 'numero_empleado': answers.get('numero_empleado', ''),
@@ -699,38 +628,100 @@ class RegistrationsByCourseNameView(APIView):
         return Response(result)
 
     def delete(self, request, nombre_curso):
-        """Delete ALL registrations for a course name — permanent."""
-        nombre = nombre_curso.strip()
-        admin_courses = Course.objects.filter(administrador=request.user)
-        registrations = CourseRegistration.objects.filter(course__in=admin_courses).prefetch_related('answers')
-
-        to_delete = []
-        for reg in registrations:
-            for answer in reg.answers.all():
-                if answer.campo_clave_snapshot == 'nombre_curso' and answer.valor_texto.strip() == nombre:
-                    to_delete.append(reg.id)
-                    break
-
-        deleted_count, _ = CourseRegistration.objects.filter(id__in=to_delete).delete()
-        return Response({'deleted': deleted_count})
+        """Active courses must be archived before permanent deletion."""
+        return Response(
+            {'detail': 'Los cursos activos deben archivarse antes de eliminarse.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
     def patch(self, request, nombre_curso):
 
-        CourseRegistration.objects.filter(
-        nombre_curso_snapshot=nombre_curso,
-        course__administrador=request.user
-    ).update(
-        curso_archivado=True
-    )
-
-        return Response({
-        'detail': 'Curso archivado'
-    })
+        updated = CourseRegistration.objects.filter(
+            nombre_curso_snapshot=nombre_curso.strip(),
+            administrador=request.user,
+            curso_archivado=False,
+        ).update(curso_archivado=True)
+        if not updated:
+            return Response(
+                {'detail': 'Curso no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response({'detail': 'Curso archivado.', 'inscripciones': updated})
 
 # ─────────────────────────────────────────────
 # TOGGLE COMPLETADO
 # ─────────────────────────────────────────────
+
+class ArchivedCoursesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        courses = (
+            CourseRegistration.objects.filter(
+                administrador=request.user,
+                curso_archivado=True,
+            )
+            .exclude(nombre_curso_snapshot='')
+            .values('nombre_curso_snapshot')
+            .annotate(
+                total=Count('id'),
+                completados=Count('id', filter=Q(completado=True)),
+            )
+            .order_by('-total', 'nombre_curso_snapshot')
+        )
+        return Response([
+            {
+                'nombre': item['nombre_curso_snapshot'],
+                'total': item['total'],
+                'completados': item['completados'],
+                'pendientes': item['total'] - item['completados'],
+            }
+            for item in courses
+        ])
+
+
+class ArchivedCourseDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self, request, nombre_curso):
+        return CourseRegistration.objects.filter(
+            administrador=request.user,
+            nombre_curso_snapshot=nombre_curso.strip(),
+            curso_archivado=True,
+        ).prefetch_related('answers')
+
+    def get(self, request, nombre_curso):
+        result = []
+        for reg in self.get_queryset(request, nombre_curso):
+            answers = {a.campo_clave_snapshot: a.valor_texto for a in reg.answers.all()}
+            result.append({
+                'id': str(reg.id),
+                'nombre': answers.get('nombre', reg.nombre_participante),
+                'correo': answers.get('correo', reg.email_participante),
+                'telefono': answers.get('telefono', ''),
+                'numero_empleado': answers.get('numero_empleado', ''),
+                'completado': reg.completado,
+                'diploma_enviado': reg.diploma_enviado,
+                'fecha_inscripcion': reg.fecha_inscripcion,
+            })
+        return Response(result)
+
+    @transaction.atomic
+    def delete(self, request, nombre_curso):
+        registrations = self.get_queryset(request, nombre_curso)
+        count = registrations.count()
+        if not count:
+            return Response(
+                {'detail': 'Curso archivado no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        registrations.delete()
+        return Response({
+            'detail': 'Curso eliminado definitivamente.',
+            'deleted': count,
+        })
+
 
 class ToggleCompletadoView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -739,7 +730,8 @@ class ToggleCompletadoView(APIView):
         try:
             reg = CourseRegistration.objects.get(
                 id=pk,
-                course__administrador=request.user
+                administrador=request.user,
+                curso_archivado=False,
             )
         except CourseRegistration.DoesNotExist:
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
@@ -766,7 +758,8 @@ class SendDiplomaView(APIView):
         try:
             reg = CourseRegistration.objects.get(
                 id=pk,
-                course__administrador=request.user
+                administrador=request.user,
+                curso_archivado=False,
             )
         except CourseRegistration.DoesNotExist:
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
@@ -848,4 +841,3 @@ class SendDiplomaView(APIView):
         })
 
 
-   

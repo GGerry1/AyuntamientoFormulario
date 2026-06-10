@@ -55,10 +55,10 @@ export default function App() {
           <Route path="/dashboard" element={
             <ProtectedRoute><DashboardPage /></ProtectedRoute>
           } />
-          <Route path="/cursos" element={
+          <Route path="/plantillas" element={
             <ProtectedRoute><CoursesPage /></ProtectedRoute>
           } />
-          <Route path="/cursos/:id" element={
+          <Route path="/cursos" element={
             <ProtectedRoute><CourseDetailPage /></ProtectedRoute>
           } />
           <Route path="/estadisticas" element={
@@ -75,7 +75,7 @@ export default function App() {
           }/>
 
           <Route path="/inscritos" element={
-            <ProtectedRoute><CourseDetailPage /></ProtectedRoute>
+            <Navigate to="/cursos" replace />
           } />
 
           {/* Individual course stats */}

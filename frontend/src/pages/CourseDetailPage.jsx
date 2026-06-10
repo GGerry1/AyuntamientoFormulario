@@ -3,11 +3,8 @@
  * Paleta institucional Acapulco
  */
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import { coursesAPI } from '../utils/api';
-
-const CAMPOS_MOSTRAR = ['nombre','correo','telefono','numero_empleado'];
 
 export default function CourseDetailPage() {
   const [cursos, setCursos] = useState([]);       // lista de nombres de curso
@@ -17,7 +14,6 @@ export default function CourseDetailPage() {
   const [loadingInscritos, setLoadingInscritos] = useState(false);
   const [search, setSearch] = useState('');
   const [diplomaModal, setDiplomaModal] = useState(null); // {regId, nombre, correo}
-  const navigate = useNavigate();
 
   // Load course names from stats endpoint
   useEffect(() => {
@@ -53,19 +49,19 @@ export default function CourseDetailPage() {
     } catch { alert('Error al actualizar estatus.'); }
   };
 
-  const handleDeleteCourse = async (nombre) => {
-    if (!window.confirm(
-      `ADVERTENCIA: Eliminar "${nombre}" borrara permanentemente todos los datos de inscripcion de este curso, incluyendo respuestas y registros. Esta accion NO se puede deshacer.\n\n¿Deseas continuar?`
-    )) return;
+  const handleArchiveCourse = async (nombre) => {
+    const archiveConfirmed = window.confirm(
+      `Archivar "${nombre}" lo movera a Cursos Archivados. Sus inscritos y estadisticas se conservaran, pero el curso NO se podra restaurar.\n\n¿Deseas continuar?`
+    );
+    if (!archiveConfirmed) return;
     try {
-      // Delete all registrations for this course name via backend
-      await coursesAPI.deleteRegistrationsByCourse(nombre);
+      await coursesAPI.archiveCourse(nombre);
       setCursos(prev => prev.filter(c => c.nombre !== nombre));
       if (selected === nombre) {
         setSelected(null);
         setInscritos([]);
       }
-    } catch { alert('Error al eliminar el curso.'); }
+    } catch { alert('Error al archivar el curso.'); }
   };
 
   const filtered = inscritos.filter(r => {
@@ -81,13 +77,13 @@ export default function CourseDetailPage() {
   const pendientes   = inscritos.length - completados;
 
   if (loadingCursos) return (
-    <DashboardLayout title="Inscritos por Curso">
+    <DashboardLayout title="Cursos">
       <p style={{ color:'rgba(255,255,255,0.4)' }}>Cargando...</p>
     </DashboardLayout>
   );
 
   return (
-    <DashboardLayout title="Inscritos por Curso">
+    <DashboardLayout title="Cursos">
       <style>{css}</style>
 
       <div style={styles.layout}>
@@ -115,10 +111,10 @@ export default function CourseDetailPage() {
                 </button>
                 <button
                   style={styles.courseDeleteBtn}
-                  onClick={() => handleDeleteCourse(nombre)}
-                  title="Eliminar curso y todos sus datos"
+                  onClick={() => handleArchiveCourse(nombre)}
+                  title="Archivar curso"
                   className="course-delete-btn"
-                >✕</button>
+                >Archivar</button>
               </div>
             ))
           )}
@@ -398,12 +394,12 @@ const styles = {
   },
   courseBtnWrap: { display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 },
   courseDeleteBtn: {
-    flexShrink: 0, width: 24, height: 24,
+    flexShrink: 0, height: 24, padding: '0 8px',
     background: 'transparent', border: '1px solid rgba(248,113,113,0.2)',
     borderRadius: 6, color: 'rgba(248,113,113,0.5)',
     cursor: 'pointer', fontSize: 11, display: 'flex',
     alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.15s', padding: 0,
+    transition: 'all 0.15s',
   },
 
   // Main panel

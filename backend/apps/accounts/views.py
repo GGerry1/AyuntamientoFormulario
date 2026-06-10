@@ -68,10 +68,10 @@ class DashboardStatsView(APIView):
         admin = request.user
         total_cursos = Course.objects.filter(administrador=admin).count()
         total_inscritos = CourseRegistration.objects.filter(
-            course__administrador=admin
+            administrador=admin
         ).count()
         completaron = CourseRegistration.objects.filter(
-            course__administrador=admin, completado=True
+            administrador=admin, completado=True
         ).count()
 
         return Response({

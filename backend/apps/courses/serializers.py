@@ -243,6 +243,7 @@ class RegistrationSubmitSerializer(serializers.Serializer):
               or request.META.get('REMOTE_ADDR'))
 
         registration = CourseRegistration.objects.create(
+            administrador=course.administrador,
             course=course,
             email_participante=email,
             nombre_participante=nombre,

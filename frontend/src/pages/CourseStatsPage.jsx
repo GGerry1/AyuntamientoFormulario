@@ -3,7 +3,7 @@
  * Route: /estadisticas/curso/:nombre
  */
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import FlexChart from '../components/charts/FlexChart';
 import { coursesAPI } from '../utils/api';
@@ -14,6 +14,8 @@ const COLORS = ['#B8952A','#4ade80','#f59e0b','#60a5fa','#f87171','#D4A832','#34
 export default function CourseStatsPage() {
   const { nombre } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isArchived = searchParams.get('archived') === '1';
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -22,11 +24,11 @@ export default function CourseStatsPage() {
   const shareUrl = `${window.location.origin}/reporte/${encodeURIComponent(decodedNombre)}`;
 
   useEffect(() => {
-    coursesAPI.statsByName(decodedNombre)
+    coursesAPI.statsByName(decodedNombre, isArchived)
       .then(res => setStats(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [decodedNombre]);
+  }, [decodedNombre, isArchived]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl).then(() => {
@@ -52,20 +54,29 @@ export default function CourseStatsPage() {
 
       {/* Actions */}
       <div style={styles.topBar} className="no-print">
-        <button style={styles.btnBack} onClick={() => navigate('/estadisticas')}>Volver</button>
+        <button
+          style={styles.btnBack}
+          onClick={() => navigate(isArchived ? '/cursos-archivados' : '/estadisticas')}
+        >
+          Volver
+        </button>
         <div style={{ display:'flex', gap:10 }}>
-          <button style={styles.btnShare} onClick={handleCopyLink}>
-            {copied ? 'Link copiado!' : 'Compartir link'}
-          </button>
+          {!isArchived && (
+            <button style={styles.btnShare} onClick={handleCopyLink}>
+              {copied ? 'Link copiado!' : 'Compartir link'}
+            </button>
+          )}
           <button style={styles.btnPrint} onClick={() => window.print()}>Imprimir</button>
         </div>
       </div>
 
       {/* Share URL */}
-      <div style={styles.shareBox} className="no-print">
-        <span style={styles.shareLabel}>Link publico:</span>
-        <span style={styles.shareUrl}>{shareUrl}</span>
-      </div>
+      {!isArchived && (
+        <div style={styles.shareBox} className="no-print">
+          <span style={styles.shareLabel}>Link publico:</span>
+          <span style={styles.shareUrl}>{shareUrl}</span>
+        </div>
+      )}
 
       {/* Summary */}
       <div style={styles.summaryRow}>

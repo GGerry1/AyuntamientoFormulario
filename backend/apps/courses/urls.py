@@ -6,6 +6,7 @@ from .views import (
     PublicInscriptionView, AdminStatisticsView, RegistrationDetailView,
     PublicCourseReportView, CourseNameStatsView, PublicCourseNameReportView,
     RegistrationsByCourseNameView, ToggleCompletadoView, SendDiplomaView,
+    ArchivedCoursesView, ArchivedCourseDetailView,
 )
 
 router = DefaultRouter()
@@ -21,7 +22,7 @@ urlpatterns = [
     # Public shareable report (no auth)
     path('public-report/<uuid:course_id>/', PublicCourseReportView.as_view(), name='public-report'),
     # Stats by curso name (authenticated)
-    path('stats-by-name/<str:nombre_curso>/', CourseNameStatsView.as_view(), name='stats-by-name'),
+    path('stats-by-name/<path:nombre_curso>/', CourseNameStatsView.as_view(), name='stats-by-name'),
     # Public report by curso name
     path('public-report-name/<str:nombre_curso>/', PublicCourseNameReportView.as_view(), name='public-report-name'),
 
@@ -29,7 +30,9 @@ urlpatterns = [
     path('registrations/<uuid:pk>/', RegistrationDetailView.as_view(), name='registration-detail'),
 
     # Registrations by curso name
-    path('registrations-by-course/<str:nombre_curso>/', RegistrationsByCourseNameView.as_view(), name='registrations-by-course'),  # GET + DELETE
+    path('registrations-by-course/<path:nombre_curso>/', RegistrationsByCourseNameView.as_view(), name='registrations-by-course'),
+    path('archived-courses/', ArchivedCoursesView.as_view(), name='archived-courses'),
+    path('archived-courses/<path:nombre_curso>/', ArchivedCourseDetailView.as_view(), name='archived-course-detail'),
 
     # Toggle completado
     path('registrations/<uuid:pk>/toggle-completado/', ToggleCompletadoView.as_view(), name='toggle-completado'),

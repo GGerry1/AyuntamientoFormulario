@@ -257,12 +257,6 @@ export default function CoursesPage() {
   };
 
   const needsOptions = (tipo) => ['select', 'radio', 'checkbox'].includes(tipo);
-  const activeCourses =
-  courses.filter(c => !c.archivado);
-
-  const archivedCourses =
-  courses.filter(c => c.archivado);
-
   const activeCourse =
   courses.find(c => c.activo);
   
@@ -295,7 +289,7 @@ export default function CoursesPage() {
           ) : courses.length === 0 ? (
             <p style={styles.empty}>No tienes plantillas. Crea la primera.</p>
           ) : (
-            activeCourses.map(c => (
+            courses.map(c => (
               <div
                 key={c.id}
                 style={{
@@ -330,44 +324,6 @@ export default function CoursesPage() {
               </div>
             ))
           )}
-
-          {archivedCourses.length > 0 && (
-  <>
-    <h4
-      style={{
-        color: '#fff',
-        marginTop: 24,
-        marginBottom: 12
-      }}
-    >
-      Plantillas Archivadas
-    </h4>
-
-    {archivedCourses.map(course => (
-      <div
-        key={course.id}
-        style={{
-          ...styles.courseItem,
-          opacity: 0.6
-        }}
-      >
-        <div style={{ color: '#fff', marginBottom: 10 }}>
-          {course.titulo}
-        </div>
-
-        <button
-          style={styles.btnPrimary}
-          onClick={async () => {
-            await coursesAPI.restore(course.id);
-            await loadCourses();
-          }}
-        >
-          Restaurar
-        </button>
-      </div>
-    ))}
-  </>
-)}
 
           {activeCourse && (
             <div style={styles.activeInfo}>
@@ -605,8 +561,9 @@ export default function CoursesPage() {
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 1.6 }}>
             Vas a eliminar la plantilla <strong style={{ color: '#fff' }}>{confirmDelete.titulo}</strong>.
             <br /><br />
-            Los registros de participantes se conservaran en la base de datos.
-            Esta accion no se puede deshacer.
+            Los cursos e inscripciones asociados pasaran a Cursos Archivados,
+            donde conservaran sus inscritos y estadisticas. La plantilla no se
+            puede restaurar.
           </p>
           <ModalActions
             onCancel={() => setConfirmDelete(null)}
