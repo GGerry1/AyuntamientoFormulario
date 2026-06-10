@@ -5,6 +5,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
+// Administrative modules: templates, active courses, and read-only history.
 const NAV = [
   { to: '/dashboard',     icon: '⌂', label: 'Inicio'         },
   { to: '/plantillas',     icon: '◧', label: 'Plantillas'      },
