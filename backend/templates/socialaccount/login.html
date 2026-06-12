@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Confirmar inicio de sesion | CursoGov</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow-x: hidden;
+            color: #fff;
+            font-family: "DM Sans", system-ui, sans-serif;
+            background: linear-gradient(160deg, #0f0a08 0%, #1a0e0b 50%, #120808 100%);
+        }
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        body::before {
+            width: 450px;
+            height: 450px;
+            top: -150px;
+            right: -150px;
+            background: radial-gradient(circle, rgba(139,26,47,0.13) 0%, transparent 65%);
+        }
+        body::after {
+            width: 380px;
+            height: 380px;
+            bottom: -100px;
+            left: -100px;
+            background: radial-gradient(circle, rgba(184,149,42,0.09) 0%, transparent 65%);
+        }
+        .card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 430px;
+            padding: 42px 40px;
+            text-align: center;
+            border: 1px solid rgba(184,149,42,0.18);
+            border-radius: 20px;
+            background: rgba(255,255,255,0.035);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            backdrop-filter: blur(20px);
+            animation: fade-up .6s cubic-bezier(.22,1,.36,1) both;
+        }
+        .logo {
+            display: block;
+            width: min(220px, 70vw);
+            height: 62px;
+            margin: 0 auto 28px;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 8px rgba(184,149,42,0.2));
+        }
+        .eyebrow {
+            margin-bottom: 12px;
+            color: #D4A832;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+        }
+        h1 {
+            margin: 0 0 14px;
+            color: #fff;
+            font-family: "Playfair Display", Georgia, serif;
+            font-size: 27px;
+            line-height: 1.2;
+        }
+        .description {
+            margin: 0 0 26px;
+            color: rgba(255,255,255,0.52);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .provider {
+            color: rgba(255,255,255,0.88);
+            font-weight: 700;
+        }
+        .continue-button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 11px;
+            padding: 14px 18px;
+            border: 0;
+            border-radius: 11px;
+            cursor: pointer;
+            color: #fff;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #B8952A, #D4A832);
+            box-shadow: 0 8px 28px rgba(184,149,42,0.25);
+            transition: transform .2s ease, opacity .2s ease;
+        }
+        .continue-button:hover {
+            opacity: .92;
+            transform: translateY(-1px);
+        }
+        .provider-icon {
+            width: 19px;
+            height: 19px;
+            flex: 0 0 auto;
+        }
+        .cancel-link {
+            display: inline-block;
+            margin-top: 18px;
+            color: rgba(255,255,255,0.38);
+            font-size: 13px;
+            text-decoration: none;
+        }
+        .cancel-link:hover { color: #D4A832; }
+        .security-note {
+            margin: 24px 0 0;
+            padding-top: 20px;
+            border-top: 1px solid rgba(184,149,42,0.12);
+            color: rgba(255,255,255,0.26);
+            font-size: 11px;
+            line-height: 1.6;
+        }
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(22px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 520px) {
+            body { padding: 16px; }
+            .card { padding: 34px 24px; }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <img
+            class="logo"
+            src="{{ site_base_url }}/logo-acapulco.png"
+            alt="H. Ayuntamiento de Acapulco 2024-2027"
+        >
+
+        <div class="eyebrow">Portal administrativo</div>
+
+        {% if process == "connect" %}
+            <h1>Vincular cuenta</h1>
+            <p class="description">
+                Confirma que deseas vincular tu cuenta de
+                <span class="provider">{{ provider.name }}</span>.
+            </p>
+        {% else %}
+            <h1>Confirmar inicio de sesion</h1>
+            <p class="description">
+                Seras redirigido de forma segura a
+                <span class="provider">
+                    {% if provider.id == "microsoft" %}Microsoft{% else %}{{ provider.name }}{% endif %}
+                </span>
+                para verificar tu identidad.
+            </p>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <button class="continue-button" type="submit">
+                {% if provider.id == "microsoft" %}
+                    <svg class="provider-icon" viewBox="0 0 23 23" aria-hidden="true">
+                        <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+                        <rect x="12" y="1" width="10" height="10" fill="#7FBA00"/>
+                        <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
+                        <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
+                    </svg>
+                {% else %}
+                    <svg class="provider-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M21.8 12.2c0-.7-.1-1.4-.2-2.1H12v4h5.5a4.7 4.7 0 0 1-2 3.1v2.6h3.3c1.9-1.8 3-4.4 3-7.6z" fill="#4285F4"/>
+                        <path d="M12 22c2.8 0 5.1-.9 6.8-2.5l-3.3-2.6c-.9.6-2.1 1-3.5 1a6 6 0 0 1-5.7-4.2H2.9v2.7A10.3 10.3 0 0 0 12 22z" fill="#34A853"/>
+                        <path d="M6.3 13.7A6 6 0 0 1 6 12c0-.6.1-1.2.3-1.7V7.6H2.9A10 10 0 0 0 2 12c0 1.6.4 3 1 4.4l3.3-2.7z" fill="#FBBC05"/>
+                        <path d="M12 6.1c1.5 0 2.9.5 3.9 1.5l3-3A10 10 0 0 0 2.9 7.6l3.4 2.7A6 6 0 0 1 12 6.1z" fill="#EA4335"/>
+                    </svg>
+                {% endif %}
+                Continuar con
+                {% if provider.id == "microsoft" %}Microsoft{% else %}{{ provider.name }}{% endif %}
+            </button>
+        </form>
+
+        <a class="cancel-link" href="{{ site_base_url }}/admin">Cancelar y volver</a>
+        <p class="security-note">
+            CursoGov no almacena tu contrasena. La autenticacion se realiza directamente con el proveedor seleccionado.
+        </p>
+    </main>
+</body>
+</html>
