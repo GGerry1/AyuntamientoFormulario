@@ -370,6 +370,12 @@ class CourseArchiveFlowTests(APITestCase):
         self.assertFalse(
             course_options.filter(valor__iregex=r'demo|prueba').exists()
         )
+        self.assertEqual(
+            templates.first().form_fields.get(
+                campo_clave='antiguedad',
+            ).label,
+            'Antigüedad Laboral (años)',
+        )
 
     def test_legacy_seed_command_runs_institutional_template_loader(self):
         output = StringIO()

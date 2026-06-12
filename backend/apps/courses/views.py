@@ -157,7 +157,7 @@ DEFAULT_FIELDS = [
         ],
     },
     {
-        'label': 'Antiguedad Laboral (anos)',
+        'label': 'Antigüedad Laboral (años)',
         'tipo': 'number',
         'obligatorio': True,
         'orden': 12,
