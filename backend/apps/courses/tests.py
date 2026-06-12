@@ -239,6 +239,22 @@ class CourseArchiveFlowTests(APITestCase):
         self.assertEqual(archived.data[0]['nombre'], 'Curso de prueba')
         self.assertEqual(archived.data[0]['total'], 1)
 
+    def test_active_template_cannot_be_deleted(self):
+        self.template.activo = True
+        self.template.save(update_fields=['activo'])
+
+        response = self.client.delete(
+            reverse('course-detail', kwargs={'pk': self.template.pk})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('plantilla activa no se puede eliminar', response.data['detail'])
+        self.assertTrue(Course.objects.filter(pk=self.template.pk).exists())
+
+        self.registration.refresh_from_db()
+        self.assertEqual(self.registration.course, self.template)
+        self.assertFalse(self.registration.curso_archivado)
+
     def test_active_course_is_archived_instead_of_deleted(self):
         response = self.client.patch(
             reverse(

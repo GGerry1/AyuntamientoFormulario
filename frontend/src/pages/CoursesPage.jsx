@@ -37,6 +37,7 @@ export default function CoursesPage() {
   const [showFieldForm, setShowFieldForm] = useState(false);
   const [editingField, setEditingField] = useState(null); // field obj to edit
   const [confirmDelete, setConfirmDelete] = useState(null); // course to delete
+  const [activeDeleteWarning, setActiveDeleteWarning] = useState(null);
 
   // Form states
   const [newCourse, setNewCourse] = useState({ titulo: '', descripcion: '', instructores: '' });
@@ -120,6 +121,14 @@ export default function CoursesPage() {
   };
 
   // ── DELETE COURSE ──
+  const requestDeleteCourse = (course) => {
+    if (course.activo) {
+      setActiveDeleteWarning(course);
+      return;
+    }
+    setConfirmDelete(course);
+  };
+
   const handleDeleteCourse = async () => {
     if (!confirmDelete) return;
     try {
@@ -130,7 +139,13 @@ export default function CoursesPage() {
         setFields([]);
       }
       setConfirmDelete(null);
-    } catch { setError('Error al eliminar la plantilla.'); }
+    } catch (err) {
+      setConfirmDelete(null);
+      setError(
+        err.response?.data?.detail ||
+        'Error al eliminar la plantilla.'
+      );
+    }
   };
 
   // ── TOGGLE ACTIVE ──
@@ -315,8 +330,8 @@ export default function CoursesPage() {
                   </button>
                   <button
                     style={{ ...styles.iconBtn, ...styles.btnDelete }}
-                    onClick={() => setConfirmDelete(c)}
-                    title="Eliminar"
+                    onClick={() => requestDeleteCourse(c)}
+                    title={c.activo ? 'La plantilla activa no se puede eliminar' : 'Eliminar'}
                   >
                     Eliminar
                   </button>
@@ -573,6 +588,33 @@ export default function CoursesPage() {
           />
         </Modal>
       )}
+
+      {activeDeleteWarning && (
+        <Modal
+          title="No se puede eliminar"
+          onClose={() => setActiveDeleteWarning(null)}
+        >
+          <div style={styles.warningBox}>
+            <strong style={styles.warningTitle}>Plantilla activa</strong>
+            <p style={styles.warningText}>
+              La plantilla <strong style={{ color: '#fff' }}>
+                {activeDeleteWarning.titulo}
+              </strong> esta activa y no se puede eliminar.
+            </p>
+            <p style={styles.warningText}>
+              Primero desactivala y despues vuelve a intentar la eliminacion.
+            </p>
+          </div>
+          <div style={styles.modalActions}>
+            <button
+              style={styles.btnSave}
+              onClick={() => setActiveDeleteWarning(null)}
+            >
+              Entendido
+            </button>
+          </div>
+        </Modal>
+      )}
     </DashboardLayout>
   );
 }
@@ -724,6 +766,20 @@ const styles = {
   modalError: { fontSize: 13, color: '#f87171', margin: 0 },
   modalNote: { fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0, fontStyle: 'italic' },
   modalActions: { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
+  warningBox: {
+    padding: '16px',
+    background: 'rgba(245,158,11,0.1)',
+    border: '1px solid rgba(245,158,11,0.3)',
+    borderRadius: 10,
+  },
+  warningTitle: {
+    display: 'block', marginBottom: 8,
+    color: '#fbbf24', fontSize: 15,
+  },
+  warningText: {
+    margin: '6px 0', color: 'rgba(255,255,255,0.7)',
+    fontSize: 14, lineHeight: 1.6,
+  },
 
   formGroup: { display: 'flex', flexDirection: 'column', gap: 6 },
   inputLabel: { fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 500 },

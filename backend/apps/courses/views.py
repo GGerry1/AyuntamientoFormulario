@@ -262,6 +262,17 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         course = self.get_object()
+        if course.activo:
+            return Response(
+                {
+                    'detail': (
+                        'La plantilla activa no se puede eliminar. '
+                        'Desactivala antes de eliminarla.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         archived_count = course.registrations.update(
             administrador=request.user,
             curso_archivado=True,
