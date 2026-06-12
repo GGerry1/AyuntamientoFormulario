@@ -1,3 +1,4 @@
+"""Create the standard institutional training templates."""
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -6,20 +7,20 @@ from apps.courses.models import Course, FieldOption
 from apps.courses.views import create_default_fields
 
 
-DEMO_TEMPLATES = [
+TRAINING_TEMPLATES = [
     {
-        'titulo': 'Plantilla Demo Administrativa',
-        'descripcion': 'Formulario de prueba para capacitacion administrativa.',
+        'titulo': 'Gestion Administrativa',
+        'descripcion': 'Capacitacion para fortalecer los procesos administrativos y la atencion institucional.',
         'instructores': 'Equipo de Capacitacion',
         'courses': [
             'Atencion Ciudadana',
-            'Excel Basico',
+            'Excel para la Gestion Publica',
             'Archivo y Transparencia',
         ],
     },
     {
-        'titulo': 'Plantilla Demo Operativa',
-        'descripcion': 'Formulario de prueba para capacitacion operativa.',
+        'titulo': 'Seguridad y Proteccion Civil',
+        'descripcion': 'Formacion preventiva para la seguridad del personal y la atencion de emergencias.',
         'instructores': 'Equipo de Proteccion Civil',
         'courses': [
             'Proteccion Civil',
@@ -28,28 +29,48 @@ DEMO_TEMPLATES = [
         ],
     },
     {
-        'titulo': 'Plantilla Demo Digital',
-        'descripcion': 'Formulario de prueba para habilidades digitales.',
+        'titulo': 'Transformacion Digital',
+        'descripcion': 'Desarrollo de competencias digitales para el servicio publico.',
         'instructores': 'Equipo de Innovacion',
         'courses': [
             'Ciberseguridad',
-            'Herramientas Google',
+            'Herramientas Colaborativas',
             'Gestion de Datos',
+        ],
+    },
+    {
+        'titulo': 'Desarrollo Humano',
+        'descripcion': 'Fortalecimiento de habilidades personales y de colaboracion en el entorno laboral.',
+        'instructores': 'Equipo de Desarrollo Organizacional',
+        'courses': [
+            'Liderazgo',
+            'Comunicacion Efectiva',
+            'Trabajo en Equipo',
+        ],
+    },
+    {
+        'titulo': 'Etica y Servicio Publico',
+        'descripcion': 'Formacion para promover una administracion publica integra, incluyente y responsable.',
+        'instructores': 'Equipo de Formacion Institucional',
+        'courses': [
+            'Etica e Integridad',
+            'Derechos Humanos',
+            'Igualdad y No Discriminacion',
         ],
     },
 ]
 
 class Command(BaseCommand):
-    help = 'Crea 3 plantillas demo con 3 opciones de curso en cada una.'
+    help = 'Crea 5 plantillas institucionales con 3 opciones de curso en cada una.'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--admin-email',
-            help='Correo del administrador propietario de los datos demo.',
+            help='Correo del administrador propietario de las plantillas.',
         )
         parser.add_argument(
             '--admin-name',
-            help='Nombre del administrador propietario de los datos demo.',
+            help='Nombre del administrador propietario de las plantillas.',
         )
 
     @transaction.atomic
@@ -60,7 +81,7 @@ class Command(BaseCommand):
         )
         created_templates = 0
 
-        for template_data in DEMO_TEMPLATES:
+        for template_data in TRAINING_TEMPLATES:
             template, created = Course.objects.get_or_create(
                 administrador=admin,
                 titulo=template_data['titulo'],
@@ -77,7 +98,7 @@ class Command(BaseCommand):
             self._add_course_options(template, template_data['courses'])
 
         self.stdout.write(self.style.SUCCESS(
-            f'Datos demo listos para {admin.email}: '
+            f'Plantillas listas para {admin.email}: '
             f'{created_templates} plantillas nuevas, sin inscripciones.'
         ))
 

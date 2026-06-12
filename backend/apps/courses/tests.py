@@ -1,6 +1,8 @@
 from io import StringIO
+from importlib import import_module
 from unittest.mock import Mock, patch
 
+from django.apps import apps as django_apps
 from django.core.management import call_command
 from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
@@ -11,6 +13,10 @@ from apps.accounts.models import Administrator
 from .models import Course, CourseRegistration, FieldOption
 from .notifications import send_registration_confirmation
 from .sendgrid_service import send_email, send_email_with_attachment
+
+create_institutional_templates = import_module(
+    'apps.courses.migrations.0008_seed_institutional_templates'
+).create_templates
 
 
 @override_settings(
@@ -321,34 +327,67 @@ class CourseArchiveFlowTests(APITestCase):
         self.registration.refresh_from_db()
         self.assertFalse(self.registration.completado)
 
-    def test_demo_seed_command_is_idempotent(self):
+    def test_template_seed_command_is_idempotent(self):
         self.admin.nombre = 'Gerardo Salinas'
         self.admin.save(update_fields=['nombre'])
         output = StringIO()
         call_command(
-            'seed_demo_courses',
+            'seed_training_templates',
             admin_name='Gerardo Salinas',
             stdout=output,
         )
         call_command(
-            'seed_demo_courses',
+            'seed_training_templates',
             admin_name='Gerardo Salinas',
             stdout=output,
         )
 
-        demo_templates = Course.objects.filter(
+        templates = Course.objects.filter(
             administrador=self.admin,
-            titulo__startswith='Plantilla Demo ',
+            titulo__in=[
+                'Gestion Administrativa',
+                'Seguridad y Proteccion Civil',
+                'Transformacion Digital',
+                'Desarrollo Humano',
+                'Etica y Servicio Publico',
+            ],
         )
-        demo_registrations = CourseRegistration.objects.filter(
+        registrations = CourseRegistration.objects.filter(
             administrador=self.admin,
-            course__in=demo_templates,
+            course__in=templates,
         )
-        demo_course_options = FieldOption.objects.filter(
-            field__course__in=demo_templates,
+        course_options = FieldOption.objects.filter(
+            field__course__in=templates,
             field__campo_clave='nombre_curso',
-        ).exclude(valor='Otro')
+        )
 
-        self.assertEqual(demo_templates.count(), 3)
-        self.assertEqual(demo_registrations.count(), 0)
-        self.assertEqual(demo_course_options.count(), 9)
+        self.assertEqual(templates.count(), 5)
+        self.assertEqual(registrations.count(), 0)
+        self.assertEqual(course_options.count(), 15)
+        self.assertFalse(
+            templates.filter(titulo__iregex=r'demo|prueba').exists()
+        )
+        self.assertFalse(
+            course_options.filter(valor__iregex=r'demo|prueba').exists()
+        )
+
+    def test_production_template_migration_is_idempotent(self):
+        production_admin = Administrator.objects.create_user(
+            email='jsc.designx@gmail.com',
+            nombre='Administrador',
+        )
+
+        create_institutional_templates(django_apps, None)
+        create_institutional_templates(django_apps, None)
+
+        templates = Course.objects.filter(administrador=production_admin)
+        course_options = FieldOption.objects.filter(
+            field__course__in=templates,
+            field__campo_clave='nombre_curso',
+        )
+
+        self.assertEqual(templates.count(), 5)
+        self.assertEqual(course_options.count(), 15)
+        self.assertFalse(
+            templates.filter(titulo__iregex=r'demo|prueba').exists()
+        )
