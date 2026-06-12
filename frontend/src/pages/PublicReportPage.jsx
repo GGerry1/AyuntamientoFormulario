@@ -57,7 +57,10 @@ export default function PublicReportPage() {
       <style>{`@media print { .no-print { display: none !important; } }`}</style>
 
       <div style={styles.header}>
-        <div style={styles.brand}>CursoGov</div>
+        <div style={styles.companyLogo} aria-label="GSC Company">
+          <span style={styles.companyMark}>GSC</span>
+          <span style={styles.companyName}>Company</span>
+        </div>
         <button style={styles.btnPrint} onClick={() => window.print()} className="no-print">
           Imprimir
         </button>
@@ -91,7 +94,7 @@ export default function PublicReportPage() {
         </div>
 
         <div style={{ textAlign:'center', fontSize:12, color:'rgba(255,255,255,0.2)', borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:24 }}>
-          Reporte generado por CursoGov
+          Reporte generado por GSC Company
         </div>
       </div>
     </div>
@@ -101,7 +104,20 @@ export default function PublicReportPage() {
 const styles = {
   page: { minHeight:'100vh', background:'#0f0a08', color:'#fff', fontFamily:'system-ui, sans-serif' },
   header: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px 40px', borderBottom:'1px solid rgba(255,255,255,0.06)' },
-  brand: { fontSize:20, fontWeight:800, background:'linear-gradient(135deg, #B8952A, #D4A832)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' },
+  companyLogo: {
+    display:'inline-flex', alignItems:'center', gap:9,
+    minHeight:36, lineHeight:1,
+  },
+  companyMark: {
+    display:'inline-flex', alignItems:'center', justifyContent:'center',
+    padding:'7px 9px', border:'1px solid rgba(212,168,50,0.55)',
+    borderRadius:8, color:'#D4A832', fontSize:17, fontWeight:900,
+    letterSpacing:'0.08em', boxShadow:'inset 0 0 16px rgba(184,149,42,0.08)',
+  },
+  companyName: {
+    color:'#fff', fontSize:16, fontWeight:700,
+    letterSpacing:'0.04em',
+  },
   btnPrint: { padding:'8px 18px', background:'rgba(74,222,128,0.12)', border:'1px solid rgba(74,222,128,0.25)', borderRadius:8, color:'#4ade80', cursor:'pointer', fontSize:13, fontWeight:600 },
   container: { maxWidth:1000, margin:'0 auto', padding:'40px 24px' },
 };
