@@ -371,6 +371,30 @@ class CourseArchiveFlowTests(APITestCase):
             course_options.filter(valor__iregex=r'demo|prueba').exists()
         )
 
+    def test_legacy_seed_command_runs_institutional_template_loader(self):
+        output = StringIO()
+
+        call_command(
+            'seed_demo_courses',
+            admin_email=self.admin.email,
+            stdout=output,
+        )
+
+        templates = Course.objects.filter(
+            administrador=self.admin,
+            titulo__in=[
+                'Gestion Administrativa',
+                'Seguridad y Proteccion Civil',
+                'Transformacion Digital',
+                'Desarrollo Humano',
+                'Etica y Servicio Publico',
+            ],
+        )
+        self.assertEqual(templates.count(), 5)
+        self.assertFalse(
+            templates.filter(titulo__iregex=r'demo|prueba').exists()
+        )
+
     def test_production_template_migration_is_idempotent(self):
         production_admin = Administrator.objects.create_user(
             email='jsc.designx@gmail.com',
