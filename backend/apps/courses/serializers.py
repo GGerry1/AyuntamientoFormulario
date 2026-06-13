@@ -226,6 +226,18 @@ class RegistrationSubmitSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     f"El campo '{field.label}' debe ser una lista."
                 )
+            valid_options = set(field.options.values_list('valor', flat=True))
+            if any(str(item) not in valid_options for item in value):
+                raise serializers.ValidationError(
+                    f"El campo '{field.label}' contiene una opcion no disponible."
+                )
+
+        elif field.tipo in ('select', 'radio'):
+            valid_options = set(field.options.values_list('valor', flat=True))
+            if str(value) not in valid_options:
+                raise serializers.ValidationError(
+                    f"La opcion seleccionada en '{field.label}' ya no esta disponible."
+                )
 
     def create_registration(self, course, request):
         answers_data = self.validated_data['answers']

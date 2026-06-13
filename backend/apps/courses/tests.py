@@ -133,6 +133,11 @@ class PublicRegistrationNotificationFlowTests(APITestCase):
             campo_clave='nombre_curso',
             orden=3,
         )
+        FieldOption.objects.create(
+            field=self.course_field,
+            valor='Proteccion Civil',
+            etiqueta='Proteccion Civil',
+        )
         self.phone_field = self.template.form_fields.create(
             label='Numero de Telefono',
             tipo='number',
@@ -209,6 +214,20 @@ class PublicRegistrationNotificationFlowTests(APITestCase):
         self.assertEqual(CourseRegistration.objects.count(), 0)
         confirmation_mock.assert_not_called()
 
+    @patch('apps.courses.views.send_registration_confirmation')
+    def test_rejects_course_option_removed_after_form_was_loaded(
+        self,
+        confirmation_mock,
+    ):
+        self.course_field.options.all().delete()
+
+        response = self.client.post(self.url, self.payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('ya no esta disponible', str(response.data))
+        self.assertEqual(CourseRegistration.objects.count(), 0)
+        confirmation_mock.assert_not_called()
+
 
 class CourseArchiveFlowTests(APITestCase):
     def setUp(self):
@@ -262,6 +281,45 @@ class CourseArchiveFlowTests(APITestCase):
         self.assertFalse(self.registration.curso_archivado)
 
     def test_active_course_is_archived_instead_of_deleted(self):
+        course_field = self.template.form_fields.create(
+            label='Nombre del Curso',
+            tipo='select',
+            campo_clave='nombre_curso',
+        )
+        FieldOption.objects.create(
+            field=course_field,
+            valor='Curso de prueba',
+            etiqueta='Curso de prueba',
+        )
+        second_template = Course.objects.create(
+            administrador=self.admin,
+            titulo='Plantilla secundaria',
+        )
+        second_field = second_template.form_fields.create(
+            label='Nombre del Curso',
+            tipo='select',
+            campo_clave='nombre_curso',
+        )
+        FieldOption.objects.create(
+            field=second_field,
+            valor='Curso de prueba',
+            etiqueta='Curso de prueba',
+        )
+        other_template = Course.objects.create(
+            administrador=self.other_admin,
+            titulo='Plantilla ajena',
+        )
+        other_field = other_template.form_fields.create(
+            label='Nombre del Curso',
+            tipo='select',
+            campo_clave='nombre_curso',
+        )
+        other_option = FieldOption.objects.create(
+            field=other_field,
+            valor='Curso de prueba',
+            etiqueta='Curso de prueba',
+        )
+
         response = self.client.patch(
             reverse(
                 'registrations-by-course',
@@ -272,6 +330,14 @@ class CourseArchiveFlowTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.registration.refresh_from_db()
         self.assertTrue(self.registration.curso_archivado)
+        self.assertFalse(
+            FieldOption.objects.filter(
+                field__course__administrador=self.admin,
+                valor='Curso de prueba',
+            ).exists()
+        )
+        self.assertTrue(FieldOption.objects.filter(pk=other_option.pk).exists())
+        self.assertGreaterEqual(response.data['opciones_eliminadas'], 2)
 
     def test_only_archived_course_can_be_deleted_permanently(self):
         active_delete = self.client.delete(

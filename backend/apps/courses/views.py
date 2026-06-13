@@ -646,10 +646,11 @@ class RegistrationsByCourseNameView(APIView):
         )
 
 
+    @transaction.atomic
     def patch(self, request, nombre_curso):
-
+        nombre = nombre_curso.strip()
         updated = CourseRegistration.objects.filter(
-            nombre_curso_snapshot=nombre_curso.strip(),
+            nombre_curso_snapshot=nombre,
             administrador=request.user,
             curso_archivado=False,
         ).update(curso_archivado=True)
@@ -658,7 +659,21 @@ class RegistrationsByCourseNameView(APIView):
                 {'detail': 'Curso no encontrado.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response({'detail': 'Curso archivado.', 'inscripciones': updated})
+
+        removed_options, _ = FieldOption.objects.filter(
+            field__course__administrador=request.user,
+            field__campo_clave='nombre_curso',
+            valor__iexact=nombre,
+        ).delete()
+
+        return Response({
+            'detail': (
+                'Curso archivado y eliminado de sus plantillas. '
+                'Ya no acepta nuevas inscripciones.'
+            ),
+            'inscripciones': updated,
+            'opciones_eliminadas': removed_options,
+        })
 
 # ─────────────────────────────────────────────
 # TOGGLE COMPLETADO

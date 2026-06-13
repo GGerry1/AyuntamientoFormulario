@@ -51,7 +51,7 @@ export default function CourseDetailPage() {
 
   const handleArchiveCourse = async (nombre) => {
     const archiveConfirmed = window.confirm(
-      `Archivar "${nombre}" lo movera a Cursos Archivados. Sus inscritos y estadisticas se conservaran, pero el curso NO se podra restaurar.\n\n¿Deseas continuar?`
+      `Archivar "${nombre}" lo movera a Cursos Archivados y lo eliminara de la plantilla para que ya no reciba nuevas inscripciones. Sus inscritos y estadisticas se conservaran, pero el curso NO se podra restaurar.\n\n¿Deseas continuar?`
     );
     if (!archiveConfirmed) return;
     try {
