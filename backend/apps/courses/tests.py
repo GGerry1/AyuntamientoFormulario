@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Administrator
-from .models import Course, CourseRegistration, FieldOption
+from .models import Course, CourseRegistration, FieldOption, RegistrationAnswer
 from .notifications import send_registration_confirmation
 from .sendgrid_service import send_email, send_email_with_attachment
 
@@ -392,6 +392,142 @@ class CourseArchiveFlowTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.registration.refresh_from_db()
         self.assertFalse(self.registration.completado)
+
+
+class RegistrationAdminCrudTests(APITestCase):
+    def setUp(self):
+        self.admin = Administrator.objects.create_user(email='admin-crud@example.com')
+        self.other_admin = Administrator.objects.create_user(email='other-crud@example.com')
+        self.client.force_authenticate(self.admin)
+        self.template = Course.objects.create(
+            administrador=self.admin,
+            titulo='Plantilla institucional',
+        )
+        self.name_field = self.template.form_fields.create(
+            label='Nombre',
+            tipo='short_text',
+            obligatorio=True,
+            campo_clave='nombre',
+        )
+        self.email_field = self.template.form_fields.create(
+            label='Correo',
+            tipo='email',
+            obligatorio=True,
+            campo_clave='correo',
+        )
+        self.phone_field = self.template.form_fields.create(
+            label='Telefono',
+            tipo='number',
+            obligatorio=True,
+            campo_clave='telefono',
+            validacion={'exact_digits': 10, 'max_digits': 10},
+        )
+        self.sex_field = self.template.form_fields.create(
+            label='Sexo',
+            tipo='select',
+            obligatorio=True,
+            campo_clave='sexo',
+        )
+        FieldOption.objects.create(
+            field=self.sex_field,
+            valor='Mujer',
+            etiqueta='Mujer',
+        )
+        FieldOption.objects.create(
+            field=self.sex_field,
+            valor='Hombre',
+            etiqueta='Hombre',
+        )
+        self.registration = CourseRegistration.objects.create(
+            administrador=self.admin,
+            course=self.template,
+            email_participante='persona@gmail.com',
+            nombre_participante='Persona Original',
+            nombre_curso_snapshot='Comunicacion Efectiva',
+        )
+        self.name_answer = self._answer(self.name_field, 'Persona Original')
+        self.email_answer = self._answer(self.email_field, 'persona@gmail.com')
+        self.phone_answer = self._answer(self.phone_field, '7441234567')
+        self.sex_answer = self._answer(self.sex_field, 'Mujer')
+        self.url = reverse(
+            'registration-detail',
+            kwargs={'pk': self.registration.pk},
+        )
+
+    def _answer(self, field, value):
+        return RegistrationAnswer.objects.create(
+            registration=self.registration,
+            field=field,
+            campo_label_snapshot=field.label,
+            campo_clave_snapshot=field.campo_clave,
+            valor_texto=value,
+        )
+
+    def test_admin_can_edit_registration_and_statistics_change(self):
+        response = self.client.patch(
+            self.url,
+            {
+                'answers': [
+                    {'id': self.name_answer.id, 'value': 'Persona Corregida'},
+                    {'id': self.email_answer.id, 'value': 'corregida@gmail.com'},
+                    {'id': self.phone_answer.id, 'value': '7447654321'},
+                    {'id': self.sex_answer.id, 'value': 'Hombre'},
+                ]
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.registration.refresh_from_db()
+        self.sex_answer.refresh_from_db()
+        self.assertEqual(self.registration.nombre_participante, 'Persona Corregida')
+        self.assertEqual(self.registration.email_participante, 'corregida@gmail.com')
+        self.assertEqual(self.sex_answer.valor_texto, 'Hombre')
+
+        stats = self.client.get(reverse('admin-statistics'))
+        self.assertEqual(stats.data['sexo'], {'Hombre': 1})
+
+    def test_edit_preserves_exact_digit_validation(self):
+        response = self.client.patch(
+            self.url,
+            {'answers': [{'id': self.phone_answer.id, 'value': '123'}]},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.phone_answer.refresh_from_db()
+        self.assertEqual(self.phone_answer.valor_texto, '7441234567')
+
+    def test_delete_removes_answers_and_statistics(self):
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            CourseRegistration.objects.filter(pk=self.registration.pk).exists()
+        )
+        self.assertFalse(
+            RegistrationAnswer.objects.filter(registration_id=self.registration.pk).exists()
+        )
+
+        stats = self.client.get(reverse('admin-statistics'))
+        self.assertEqual(stats.data['sexo'], {})
+        self.assertEqual(stats.data['cursos_lista'], [])
+
+    def test_other_administrator_cannot_edit_or_delete_registration(self):
+        self.client.force_authenticate(self.other_admin)
+
+        patch_response = self.client.patch(
+            self.url,
+            {'answers': [{'id': self.name_answer.id, 'value': 'Sin permiso'}]},
+            format='json',
+        )
+        delete_response = self.client.delete(self.url)
+
+        self.assertEqual(patch_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(delete_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(
+            CourseRegistration.objects.filter(pk=self.registration.pk).exists()
+        )
 
     def test_template_seed_command_is_idempotent(self):
         self.admin.nombre = 'Gerardo Salinas'

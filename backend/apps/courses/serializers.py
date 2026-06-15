@@ -1,5 +1,6 @@
 """Courses Serializers - Updated"""
 import re
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Course, CourseFormField, FieldOption, CourseRegistration, RegistrationAnswer
 
@@ -292,19 +293,120 @@ class RegistrationSubmitSerializer(serializers.Serializer):
 # ─────────────────────────────────────────────
 
 class RegistrationAnswerSerializer(serializers.ModelSerializer):
+    field_id = serializers.SerializerMethodField()
     field_label = serializers.SerializerMethodField()
     field_tipo = serializers.SerializerMethodField()
+    campo_clave = serializers.SerializerMethodField()
+    obligatorio = serializers.SerializerMethodField()
+    options = serializers.SerializerMethodField()
+    validacion = serializers.SerializerMethodField()
     value = serializers.ReadOnlyField()
 
     class Meta:
         model = RegistrationAnswer
-        fields = ['field_label', 'field_tipo', 'value']
+        fields = [
+            'id', 'field_id', 'field_label', 'field_tipo', 'campo_clave',
+            'obligatorio', 'options', 'validacion', 'value',
+        ]
+
+    def get_field_id(self, obj):
+        return str(obj.field_id) if obj.field_id else None
 
     def get_field_label(self, obj):
         return obj.campo_label_snapshot or (obj.field.label if obj.field else '')
 
     def get_field_tipo(self, obj):
         return obj.field.tipo if obj.field else ''
+
+    def get_campo_clave(self, obj):
+        return obj.campo_clave_snapshot or (obj.field.campo_clave if obj.field else '')
+
+    def get_obligatorio(self, obj):
+        return obj.field.obligatorio if obj.field else False
+
+    def get_options(self, obj):
+        if not obj.field:
+            return []
+        return FieldOptionSerializer(obj.field.options.all(), many=True).data
+
+    def get_validacion(self, obj):
+        return obj.field.validacion if obj.field else None
+
+
+class RegistrationAnswerUpdateSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    value = serializers.JSONField()
+
+
+class RegistrationAdminUpdateSerializer(serializers.Serializer):
+    answers = RegistrationAnswerUpdateSerializer(many=True, required=False)
+    completado = serializers.BooleanField(required=False)
+
+    def validate_answers(self, answers):
+        registration = self.context['registration']
+        answer_map = {
+            str(answer.id): answer
+            for answer in registration.answers.select_related('field').prefetch_related(
+                'field__options'
+            )
+        }
+        submitted_ids = [str(item['id']) for item in answers]
+
+        if len(submitted_ids) != len(set(submitted_ids)):
+            raise serializers.ValidationError('No se puede editar una respuesta dos veces.')
+
+        validator = RegistrationSubmitSerializer()
+        for item in answers:
+            answer = answer_map.get(str(item['id']))
+            if not answer:
+                raise serializers.ValidationError(
+                    'Una de las respuestas no pertenece a esta inscripcion.'
+                )
+            if answer.field:
+                value = item['value']
+                if answer.field.obligatorio and value in (None, '', []):
+                    raise serializers.ValidationError(
+                        f"El campo '{answer.field.label}' es obligatorio."
+                    )
+                validator._validate_field(answer.field, value)
+
+        return answers
+
+    def update(self, registration, validated_data):
+        answer_map = {
+            str(answer.id): answer
+            for answer in registration.answers.select_related('field')
+        }
+
+        for item in validated_data.get('answers', []):
+            answer = answer_map[str(item['id'])]
+            value = item['value']
+            answer.valor_multiple = value if isinstance(value, list) else None
+            answer.valor_texto = (
+                '' if isinstance(value, list)
+                else str(value) if value is not None else ''
+            )
+            answer.save(update_fields=['valor_multiple', 'valor_texto'])
+
+            key = answer.campo_clave_snapshot or (
+                answer.field.campo_clave if answer.field else ''
+            )
+            if key == 'nombre':
+                registration.nombre_participante = answer.valor_texto
+            elif key == 'correo':
+                registration.email_participante = answer.valor_texto
+            elif key == 'nombre_curso':
+                registration.nombre_curso_snapshot = answer.valor_texto
+
+        if 'completado' in validated_data:
+            registration.completado = validated_data['completado']
+            registration.fecha_completado = (
+                registration.fecha_completado or timezone.now()
+                if registration.completado else None
+            )
+
+        registration.save()
+        return registration
 
 
 class RegistrationSerializer(serializers.ModelSerializer):

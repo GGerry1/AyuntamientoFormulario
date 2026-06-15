@@ -120,6 +120,13 @@ export const coursesAPI = {
   toggleCompletado: (regId) =>
     api.patch(`/courses/registrations/${regId}/toggle-completado/`),
 
+  getRegistration: (regId) =>
+    api.get(`/courses/registrations/${regId}/`),
+  updateRegistration: (regId, data) =>
+    api.patch(`/courses/registrations/${regId}/`, data),
+  deleteRegistration: (regId) =>
+    api.delete(`/courses/registrations/${regId}/`),
+
   sendDiploma: (regId, formData) =>
     api.post(`/courses/registrations/${regId}/send-diploma/`, formData),
 

@@ -25,7 +25,7 @@ from .serializers import (
     CourseFormFieldSerializer, CourseFormFieldWriteSerializer,
     PublicFormSerializer, RegistrationSubmitSerializer,
     RegistrationSerializer, RegistrationListSerializer,
-    MarkCompletedSerializer,
+    RegistrationAdminUpdateSerializer,
 )
 
 MAX_PLANTILLAS = 10
@@ -371,7 +371,7 @@ class CourseFormFieldViewSet(viewsets.ModelViewSet):
 # ADMIN — REGISTRATIONS
 # ─────────────────────────────────────────────
 
-class RegistrationDetailView(generics.RetrieveUpdateAPIView):
+class RegistrationDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = RegistrationSerializer
 
@@ -379,18 +379,20 @@ class RegistrationDetailView(generics.RetrieveUpdateAPIView):
         return CourseRegistration.objects.filter(
             administrador=self.request.user,
             curso_archivado=False,
-        ).prefetch_related('answers__field')
+        ).prefetch_related('answers__field__options')
 
     def patch(self, request, *args, **kwargs):
         registration = self.get_object()
-        serializer = MarkCompletedSerializer(data=request.data)
-        if serializer.is_valid():
-            registration.completado = serializer.validated_data['completado']
-            if registration.completado and not registration.fecha_completado:
-                registration.fecha_completado = timezone.now()
-            registration.save()
-            return Response(RegistrationSerializer(registration).data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = RegistrationAdminUpdateSerializer(
+            data=request.data,
+            context={'registration': registration},
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            serializer.update(registration, serializer.validated_data)
+        registration.refresh_from_db()
+        return Response(RegistrationSerializer(registration).data)
 
 
 # ─────────────────────────────────────────────

@@ -14,6 +14,8 @@ export default function CourseDetailPage() {
   const [loadingInscritos, setLoadingInscritos] = useState(false);
   const [search, setSearch] = useState('');
   const [diplomaModal, setDiplomaModal] = useState(null); // {regId, nombre, correo}
+  const [editModal, setEditModal] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
 
   // Load course names from stats endpoint
   useEffect(() => {
@@ -62,6 +64,45 @@ export default function CourseDetailPage() {
         setInscritos([]);
       }
     } catch { alert('Error al archivar el curso.'); }
+  };
+
+  const reloadCourseData = async (courseName = selected) => {
+    const [statsRes, registrationsRes] = await Promise.all([
+      coursesAPI.adminStats(),
+      courseName
+        ? coursesAPI.registrationsByCourse(courseName)
+        : Promise.resolve({ data: [] }),
+    ]);
+    const lista = statsRes.data.cursos_lista || [];
+    setCursos(lista);
+    if (courseName && lista.some(course => course.nombre === courseName)) {
+      setSelected(courseName);
+      setInscritos(registrationsRes.data);
+    } else {
+      setSelected(lista[0]?.nombre || null);
+      setInscritos([]);
+    }
+  };
+
+  const handleEditRegistration = async (regId) => {
+    try {
+      const response = await coursesAPI.getRegistration(regId);
+      setEditModal(response.data);
+    } catch {
+      alert('No fue posible cargar la informacion del inscrito.');
+    }
+  };
+
+  const handleDeleteRegistration = async () => {
+    if (!deleteModal) return;
+    try {
+      await coursesAPI.deleteRegistration(deleteModal.id);
+      setInscritos(prev => prev.filter(reg => reg.id !== deleteModal.id));
+      setDeleteModal(null);
+      await reloadCourseData(selected);
+    } catch {
+      alert('No fue posible eliminar al inscrito.');
+    }
   };
 
   const filtered = inscritos.filter(r => {
@@ -154,7 +195,7 @@ export default function CourseDetailPage() {
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        {['Nombre','Correo','Telefono','No. Empleado','Estatus','Diploma'].map(h => (
+                        {['Nombre','Correo','Telefono','No. Empleado','Estatus','Diploma','Acciones'].map(h => (
                           <th key={h} style={styles.th}>{h}</th>
                         ))}
                       </tr>
@@ -199,6 +240,24 @@ export default function CourseDetailPage() {
                               <span style={styles.diplomaDisabled}>—</span>
                             )}
                           </td>
+                          <td style={{ ...styles.td, textAlign:'center' }}>
+                            <div style={styles.rowActions}>
+                              <button
+                                style={styles.editBtn}
+                                onClick={() => handleEditRegistration(reg.id)}
+                                className="edit-btn"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                style={styles.deleteBtn}
+                                onClick={() => setDeleteModal(reg)}
+                                className="delete-btn"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -225,7 +284,200 @@ export default function CourseDetailPage() {
           }}
         />
       )}
+      {editModal && (
+        <EditRegistrationModal
+          registration={editModal}
+          onClose={() => setEditModal(null)}
+          onSaved={async () => {
+            setEditModal(null);
+            await reloadCourseData(selected);
+          }}
+        />
+      )}
+      {deleteModal && (
+        <ConfirmDeleteModal
+          registration={deleteModal}
+          onClose={() => setDeleteModal(null)}
+          onConfirm={handleDeleteRegistration}
+        />
+      )}
     </DashboardLayout>
+  );
+}
+
+function EditRegistrationModal({ registration, onClose, onSaved }) {
+  const [answers, setAnswers] = useState(
+    registration.answers.map(answer => ({ ...answer }))
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const updateValue = (id, value) => {
+    setAnswers(prev => prev.map(answer =>
+      answer.id === id ? { ...answer, value } : answer
+    ));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await coursesAPI.updateRegistration(registration.id, {
+        answers: answers.map(answer => ({ id: answer.id, value: answer.value })),
+      });
+      await onSaved();
+    } catch (e) {
+      const details = e?.response?.data;
+      const message = details?.answers?.[0] || details?.detail ||
+        (typeof details === 'string' ? details : null);
+      setError(message || 'No fue posible guardar los cambios.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={modal.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div
+        style={{ ...modal.card, maxWidth: 620, maxHeight: '88vh', overflowY: 'auto' }}
+        className="fade-up"
+      >
+        <div style={modal.header}>
+          <h3 style={modal.title}>Editar inscrito</h3>
+          <button style={modal.closeBtn} onClick={onClose}>X</button>
+        </div>
+        <div style={modal.formGrid}>
+          {answers.map(answer => (
+            <RegistrationField
+              key={answer.id}
+              answer={answer}
+              onChange={value => updateValue(answer.id, value)}
+            />
+          ))}
+        </div>
+        {error && <div style={modal.error}>{error}</div>}
+        <div style={modal.actions}>
+          <button style={modal.cancelBtn} onClick={onClose} disabled={saving}>
+            Cancelar
+          </button>
+          <button
+            style={{ ...modal.sendBtn, ...(saving ? modal.sendBtnDisabled : {}) }}
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RegistrationField({ answer, onChange }) {
+  const commonProps = {
+    style: modal.input,
+    value: answer.value ?? '',
+    required: answer.obligatorio,
+    onChange: event => onChange(event.target.value),
+  };
+
+  let input = <input type="text" {...commonProps} />;
+  if (answer.field_tipo === 'email') {
+    input = <input type="email" {...commonProps} />;
+  } else if (answer.field_tipo === 'number') {
+    input = (
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={answer.validacion?.exact_digits || answer.validacion?.max_digits}
+        {...commonProps}
+        onChange={event => onChange(event.target.value.replace(/\D/g, ''))}
+      />
+    );
+  } else if (answer.field_tipo === 'long_text') {
+    input = <textarea {...commonProps} rows={3} />;
+  } else if (answer.field_tipo === 'date') {
+    input = <input type="date" {...commonProps} />;
+  } else if (answer.field_tipo === 'time') {
+    input = <input type="time" {...commonProps} />;
+  } else if (answer.field_tipo === 'datetime') {
+    input = <input type="datetime-local" {...commonProps} />;
+  } else if (['select', 'radio'].includes(answer.field_tipo)) {
+    input = (
+      <select {...commonProps}>
+        <option value="">Selecciona una opcion</option>
+        {answer.options.map(option => (
+          <option key={option.id} value={option.valor}>{option.etiqueta}</option>
+        ))}
+      </select>
+    );
+  } else if (answer.field_tipo === 'checkbox') {
+    const selectedValues = Array.isArray(answer.value) ? answer.value : [];
+    input = (
+      <div style={modal.checkboxList}>
+        {answer.options.map(option => (
+          <label key={option.id} style={modal.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={selectedValues.includes(option.valor)}
+              onChange={event => {
+                const next = event.target.checked
+                  ? [...selectedValues, option.valor]
+                  : selectedValues.filter(value => value !== option.valor);
+                onChange(next);
+              }}
+            />
+            {option.etiqueta}
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <label style={modal.field}>
+      <span style={modal.fieldLabel}>
+        {answer.field_label}{answer.obligatorio ? ' *' : ''}
+      </span>
+      {input}
+    </label>
+  );
+}
+
+function ConfirmDeleteModal({ registration, onClose, onConfirm }) {
+  const [deleting, setDeleting] = useState(false);
+
+  const confirm = async () => {
+    setDeleting(true);
+    await onConfirm();
+    setDeleting(false);
+  };
+
+  return (
+    <div style={modal.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={modal.card} className="fade-up">
+        <div style={modal.header}>
+          <h3 style={modal.title}>Eliminar inscrito</h3>
+          <button style={modal.closeBtn} onClick={onClose}>X</button>
+        </div>
+        <p style={modal.warningText}>
+          Se eliminara definitivamente a <strong>{registration.nombre || registration.correo}</strong>,
+          sus respuestas y sus datos en las estadisticas. Esta accion no se puede deshacer.
+        </p>
+        <div style={modal.actions}>
+          <button style={modal.cancelBtn} onClick={onClose} disabled={deleting}>
+            Cancelar
+          </button>
+          <button
+            style={{ ...modal.dangerBtn, ...(deleting ? modal.sendBtnDisabled : {}) }}
+            onClick={confirm}
+            disabled={deleting}
+          >
+            {deleting ? 'Eliminando...' : 'Eliminar definitivamente'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -350,6 +602,8 @@ const css = `
   .table-row:hover { background: rgba(184,149,42,0.05) !important; }
   .status-btn:hover { opacity: 0.85; transform: scale(0.97); }
   .diploma-btn:hover { opacity: 0.85; transform: scale(0.97); }
+  .edit-btn:hover { border-color: rgba(184,149,42,0.55) !important; }
+  .delete-btn:hover { background: rgba(248,113,113,0.12) !important; }
   .course-delete-btn:hover { background: rgba(248,113,113,0.1) !important; border-color: rgba(248,113,113,0.5) !important; color: #f87171 !important; }
   .drop-zone:hover { border-color: rgba(184,149,42,0.5) !important; background: rgba(184,149,42,0.06) !important; cursor: pointer; }
 `;
@@ -390,7 +644,10 @@ const styles = {
     border: '1px solid rgba(184,149,42,0.25)',
     color: '#D4A832',
   },
-  courseBtnName: { overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 },
+  courseBtnName: {
+    minWidth: 0, flex: 1, overflowWrap: 'anywhere',
+    whiteSpace: 'normal', lineHeight: 1.35,
+  },
   courseBtnCount: {
     fontSize: 11, fontWeight: 700,
     background: 'rgba(255,255,255,0.08)',
@@ -401,9 +658,13 @@ const styles = {
     background: 'rgba(184,149,42,0.2)',
     color: '#D4A832',
   },
-  courseBtnWrap: { display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 },
+  courseBtnWrap: {
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'stretch', gap: 4, marginBottom: 8,
+    minWidth: 0, overflow: 'hidden',
+  },
   courseDeleteBtn: {
-    flexShrink: 0, height: 24, padding: '0 8px',
+    width: '100%', minHeight: 28, padding: '4px 8px',
     background: 'transparent', border: '1px solid rgba(248,113,113,0.2)',
     borderRadius: 6, color: 'rgba(248,113,113,0.5)',
     cursor: 'pointer', fontSize: 11, display: 'flex',
@@ -481,6 +742,21 @@ const styles = {
     color: '#4ade80',
   },
   diplomaDisabled: { color: 'rgba(255,255,255,0.2)', fontSize: 13 },
+  rowActions: {
+    display: 'flex', gap: 6, justifyContent: 'center', whiteSpace: 'nowrap',
+  },
+  editBtn: {
+    padding: '5px 10px', borderRadius: 7,
+    background: 'rgba(184,149,42,0.1)',
+    border: '1px solid rgba(184,149,42,0.25)',
+    color: '#D4A832', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+  },
+  deleteBtn: {
+    padding: '5px 10px', borderRadius: 7,
+    background: 'transparent',
+    border: '1px solid rgba(248,113,113,0.25)',
+    color: '#f87171', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+  },
 
   loading: { color: 'rgba(255,255,255,0.4)', fontSize: 14, padding: '40px 0' },
   empty:   { color: 'rgba(255,255,255,0.35)', fontSize: 14, padding: '40px 0' },
@@ -550,6 +826,34 @@ const modal = {
     border: '1px solid rgba(248,113,113,0.2)',
     borderRadius: 8, padding: '8px 12px', marginBottom: 16,
   },
+  formGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: 16, marginBottom: 20,
+  },
+  field: { display: 'flex', flexDirection: 'column', gap: 7 },
+  fieldLabel: {
+    fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)',
+  },
+  input: {
+    width: '100%', boxSizing: 'border-box',
+    padding: '10px 12px', borderRadius: 8,
+    border: '1px solid rgba(184,149,42,0.2)',
+    background: 'rgba(255,255,255,0.04)',
+    color: '#fff', fontFamily: 'inherit', fontSize: 13, outline: 'none',
+  },
+  checkboxList: {
+    display: 'flex', flexDirection: 'column', gap: 8,
+    padding: 10, borderRadius: 8,
+    border: '1px solid rgba(184,149,42,0.2)',
+  },
+  checkboxLabel: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    color: 'rgba(255,255,255,0.7)', fontSize: 13,
+  },
+  warningText: {
+    color: 'rgba(255,255,255,0.7)', fontSize: 14,
+    lineHeight: 1.6, margin: '0 0 24px',
+  },
   actions: { display: 'flex', gap: 10, justifyContent: 'flex-end' },
   cancelBtn: {
     padding: '10px 20px', background: 'transparent',
@@ -566,4 +870,10 @@ const modal = {
     boxShadow: '0 4px 16px rgba(184,149,42,0.3)',
   },
   sendBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
+  dangerBtn: {
+    padding: '10px 18px', background: 'rgba(248,113,113,0.14)',
+    border: '1px solid rgba(248,113,113,0.35)',
+    borderRadius: 9, color: '#f87171',
+    cursor: 'pointer', fontSize: 13, fontWeight: 700,
+  },
 };
