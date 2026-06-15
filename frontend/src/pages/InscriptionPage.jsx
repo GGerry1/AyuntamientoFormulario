@@ -2,7 +2,7 @@
  * InscriptionPage - Public, accessed via QR code
  * Route: /inscripcion/:token
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { publicAPI } from '../utils/api';
 import DynamicFormRenderer from '../components/forms/DynamicFormRenderer';
@@ -23,6 +23,40 @@ export default function InscriptionPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
+
+  useEffect(() => {
+    const renderCaptcha = () => {
+      if (!captchaRef.current || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.grecaptcha.render(captchaRef.current, {
+        sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY ||
+          '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI',
+        theme: 'dark',
+        callback: setCaptchaToken,
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => setCaptchaToken(''),
+      });
+    };
+
+    if (window.grecaptcha) {
+      renderCaptcha();
+      return undefined;
+    }
+
+    window.onPublicRecaptchaLoad = renderCaptcha;
+    const existing = document.querySelector('script[data-public-recaptcha]');
+    if (!existing) {
+      const script = document.createElement('script');
+      script.src = 'https://www.google.com/recaptcha/api.js?onload=onPublicRecaptchaLoad&render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.dataset.publicRecaptcha = 'true';
+      document.head.appendChild(script);
+    }
+    return () => { delete window.onPublicRecaptchaLoad; };
+  }, []);
 
   useEffect(() => {
     publicAPI.getForm(token)
@@ -62,6 +96,10 @@ export default function InscriptionPage() {
       setError('Debes aceptar los terminos y condiciones para continuar.');
       return;
     }
+    if (!captchaToken) {
+      setError('Completa la verificación CAPTCHA para continuar.');
+      return;
+    }
     const errors = validate();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -72,13 +110,20 @@ export default function InscriptionPage() {
       const answers = Object.entries(values).map(([field_id, value]) => ({
         field_id, value
       }));
-      await publicAPI.submitForm(token, { answers });
+      await publicAPI.submitForm(token, {
+        answers,
+        captcha_token: captchaToken,
+      });
       setSuccess(true);
     } catch (err) {
       const msg = err.response?.data?.detail ||
         Object.values(err.response?.data || {}).flat().join(' ') ||
         'Error al enviar el formulario.';
       setError(msg);
+      if (captchaWidgetRef.current !== null && window.grecaptcha) {
+        window.grecaptcha.reset(captchaWidgetRef.current);
+        setCaptchaToken('');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -162,12 +207,19 @@ export default function InscriptionPage() {
               </label>
             </div>
 
+            <div style={styles.captchaWrap}>
+              <div ref={captchaRef} />
+            </div>
+
             {error && <p style={styles.submitError}>{error}</p>}
 
             <button
-              style={{ ...styles.submitBtn, ...(submitting ? styles.submitDisabled : {}) }}
+              style={{
+                ...styles.submitBtn,
+                ...((submitting || !captchaToken) ? styles.submitDisabled : {}),
+              }}
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || !captchaToken}
             >
               {submitting ? 'Enviando…' : 'Enviar inscripcion'}
             </button>
@@ -296,6 +348,10 @@ const styles = {
   },
   submitDisabled: { opacity: 0.6, cursor: 'not-allowed', transform: 'none' },
   submitError: { color: '#e53e3e', fontSize: 14, marginTop: 16, textAlign: 'center' },
+  captchaWrap: {
+    display: 'flex', justifyContent: 'center',
+    marginTop: 22, minHeight: 78,
+  },
   termsWrap: { marginTop: 20, marginBottom: 4 },
   termsLabel: { display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontSize: 13, color: '#4a5568', lineHeight: 1.6 },
   termsCheck: { marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: '#B8952A', flexShrink: 0 },

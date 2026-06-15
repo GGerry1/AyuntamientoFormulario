@@ -1,15 +1,18 @@
-from io import StringIO
+from io import BytesIO, StringIO
 from importlib import import_module
 from unittest.mock import Mock, patch
 
 from django.apps import apps as django_apps
 from django.core.management import call_command
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Administrator
+from PIL import Image
+from .file_validation import InvalidUpload, validate_diploma_upload
 from .models import Course, CourseRegistration, FieldOption, RegistrationAnswer
 from .notifications import send_registration_confirmation
 from .sendgrid_service import send_email, send_email_with_attachment
@@ -107,6 +110,32 @@ class RegistrationNotificationTests(SimpleTestCase):
             )
 
 
+class DiplomaFileValidationTests(SimpleTestCase):
+    def test_rejects_spoofed_pdf(self):
+        upload = SimpleUploadedFile(
+            'diploma.pdf',
+            b'not a real pdf',
+            content_type='application/pdf',
+        )
+
+        with self.assertRaises(InvalidUpload):
+            validate_diploma_upload(upload)
+
+    def test_accepts_verified_png(self):
+        buffer = BytesIO()
+        Image.new('RGB', (10, 10), color='white').save(buffer, format='PNG')
+        upload = SimpleUploadedFile(
+            'diploma.png',
+            buffer.getvalue(),
+            content_type='image/png',
+        )
+
+        result = validate_diploma_upload(upload)
+
+        self.assertEqual(result['extension'], 'png')
+        self.assertEqual(result['content_type'], 'image/png')
+
+
 class PublicRegistrationNotificationFlowTests(APITestCase):
     def setUp(self):
         self.admin = Administrator.objects.create_user(email='admin@example.com')
@@ -180,6 +209,33 @@ class PublicRegistrationNotificationFlowTests(APITestCase):
             'Proteccion Civil',
         )
         confirmation_mock.assert_called_once_with(registration)
+
+    @patch('apps.courses.views.send_registration_confirmation')
+    def test_rejects_duplicate_email_or_employee_for_same_course(
+        self,
+        confirmation_mock,
+    ):
+        first = self.client.post(self.url, self.payload, format='json')
+        second = self.client.post(self.url, self.payload, format='json')
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(CourseRegistration.objects.count(), 1)
+        self.assertIn('Ya existe una inscripción', second.data['detail'])
+        self.assertEqual(confirmation_mock.call_count, 1)
+
+    @override_settings(RECAPTCHA_ENABLED=True, RECAPTCHA_SECRET_KEY='secret')
+    @patch('apps.courses.views.verify_recaptcha', return_value=False)
+    def test_rejects_invalid_captcha(self, _captcha_mock):
+        response = self.client.post(
+            self.url,
+            {**self.payload, 'captcha_token': 'invalid'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('CAPTCHA', response.data['detail'])
+        self.assertEqual(CourseRegistration.objects.count(), 0)
 
     @patch(
         'apps.courses.views.send_registration_confirmation',

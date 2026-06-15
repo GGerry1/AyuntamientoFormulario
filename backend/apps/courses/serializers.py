@@ -165,6 +165,25 @@ class AnswerSubmitSerializer(serializers.Serializer):
 class RegistrationSubmitSerializer(serializers.Serializer):
     answers = AnswerSubmitSerializer(many=True)
 
+    def get_identity(self, course):
+        fields = {
+            str(field.id): field
+            for field in course.form_fields.filter(activo=True)
+        }
+        identity = {'email': '', 'course_name': course.titulo, 'employee_number': ''}
+        for answer in self.validated_data['answers']:
+            field = fields.get(str(answer['field_id']))
+            if not field:
+                continue
+            value = str(answer['value']).strip()
+            if field.tipo == 'email':
+                identity['email'] = value.lower()
+            if field.campo_clave == 'nombre_curso':
+                identity['course_name'] = value
+            if field.campo_clave == 'numero_empleado':
+                identity['employee_number'] = value
+        return identity
+
     def validate(self, data):
         course = self.context.get('course')
         if not course or not course.activo:
@@ -244,20 +263,17 @@ class RegistrationSubmitSerializer(serializers.Serializer):
         answers_data = self.validated_data['answers']
         fields_map = {str(f.id): f for f in course.form_fields.filter(activo=True)}
 
-        email = ''
+        identity = self.get_identity(course)
+        email = identity['email']
         nombre = ''
-        nombre_curso = ''
+        nombre_curso = identity['course_name']
 
         for answer in answers_data:
             field = fields_map.get(str(answer['field_id']))
             if not field:
                 continue
-            if field.tipo == 'email':
-                email = str(answer['value'])
             if field.campo_clave == 'nombre':
                 nombre = str(answer['value'])
-            if field.campo_clave == 'nombre_curso':
-                nombre_curso = str(answer['value'])
 
         ip = (request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
               or request.META.get('REMOTE_ADDR'))

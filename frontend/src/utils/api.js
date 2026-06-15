@@ -1,5 +1,5 @@
 /**
- * API Client - Axios with JWT auto-refresh
+ * API Client - HttpOnly JWT cookies with CSRF and automatic refresh.
  */
 import axios from 'axios';
 
@@ -11,10 +11,19 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach access token
+let csrfToken = '';
+
+export const ensureCsrfToken = async () => {
+  if (csrfToken) return csrfToken;
+  const { data } = await axios.get(`${API_BASE}/auth/csrf/`, {
+    withCredentials: true,
+  });
+  csrfToken = data.csrfToken;
+  return csrfToken;
+};
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (csrfToken) config.headers['X-CSRFToken'] = csrfToken;
   if (config.data instanceof FormData) {
     if (typeof config.headers.delete === 'function') {
       config.headers.delete('Content-Type');
@@ -29,10 +38,10 @@ api.interceptors.request.use((config) => {
 let isRefreshing = false;
 let failedQueue = [];
 
-const processQueue = (error, token = null) => {
+const processQueue = (error) => {
   failedQueue.forEach((prom) => {
     if (error) prom.reject(error);
-    else prom.resolve(token);
+    else prom.resolve();
   });
   failedQueue = [];
 };
@@ -45,26 +54,25 @@ api.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return api(originalRequest);
-        });
+        }).then(() => api(originalRequest));
       }
       originalRequest._retry = true;
       isRefreshing = true;
       try {
-        const refresh = localStorage.getItem('refresh_token');
-        if (!refresh) throw new Error('No refresh token');
-        const { data } = await axios.post(`${API_BASE}/auth/token/refresh/`, { refresh });
-        localStorage.setItem('access_token', data.access);
-        processQueue(null, data.access);
-        originalRequest.headers.Authorization = `Bearer ${data.access}`;
+        const token = await ensureCsrfToken();
+        await axios.post(
+          `${API_BASE}/auth/token/refresh/`,
+          {},
+          {
+            withCredentials: true,
+            headers: { 'X-CSRFToken': token },
+          }
+        );
+        processQueue(null);
         return api(originalRequest);
       } catch (err) {
-        processQueue(err, null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/admin';
+        processQueue(err);
+        window.dispatchEvent(new Event('auth:expired'));
         return Promise.reject(err);
       } finally {
         isRefreshing = false;
@@ -78,9 +86,10 @@ export default api;
 
 // Auth
 export const authAPI = {
+  ensureCsrf: ensureCsrfToken,
   me: () => api.get('/auth/me/'),
   updateProfile: (data) => api.patch('/auth/me/', data),
-  logout: (refresh) => api.post('/auth/logout/', { refresh }),
+  logout: () => api.post('/auth/logout/', {}),
   dashboardStats: () => api.get('/auth/dashboard/stats/'),
 };
 

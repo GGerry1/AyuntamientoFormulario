@@ -14,3 +14,5 @@ PASSWORD_HASHERS = [
 
 EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
 SECURE_SSL_REDIRECT = False
+RECAPTCHA_ENABLED = False
+JWT_COOKIE_SECURE = False

@@ -1,5 +1,4 @@
 """Diplomas Views"""
-import os
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.views import APIView
@@ -7,12 +6,9 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from apps.courses.models import CourseRegistration
+from apps.courses.file_validation import InvalidUpload, validate_diploma_upload
 from apps.courses.sendgrid_service import send_email_with_attachment
 from .models import Diploma
-
-
-ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
 class DiplomaUploadView(APIView):
@@ -46,22 +42,18 @@ class DiplomaUploadView(APIView):
         if not file:
             return Response({'detail': 'No se recibió ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate extension
-        ext = file.name.rsplit('.', 1)[-1].lower()
-        if ext not in ALLOWED_EXTENSIONS:
+        try:
+            validated_file = validate_diploma_upload(file)
+        except InvalidUpload as exc:
             return Response(
-                {'detail': f'Tipo no permitido. Usa: {", ".join(ALLOWED_EXTENSIONS)}'},
+                {'detail': str(exc)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        # Validate size
-        if file.size > MAX_FILE_SIZE:
-            return Response({'detail': 'El archivo supera los 10MB.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Save or overwrite diploma
         diploma, _ = Diploma.objects.get_or_create(registration=registration)
         diploma.archivo = file
-        diploma.tipo_archivo = ext
+        diploma.tipo_archivo = validated_file['extension']
         diploma.enviado = False
         diploma.error_envio = ''
         diploma.save()

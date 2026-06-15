@@ -19,6 +19,8 @@ from rest_framework.views import APIView
 
 from .models import Course, CourseFormField, FieldOption, CourseRegistration
 from .notifications import send_registration_confirmation
+from .file_validation import InvalidUpload, validate_diploma_upload
+from .security import verify_recaptcha
 from .sendgrid_service import send_email_with_attachment
 from .serializers import (
     CourseSerializer, CourseWriteSerializer, CourseActivateSerializer,
@@ -210,12 +212,53 @@ class PublicInscriptionView(APIView):
                 {'detail': 'No hay ningun curso activo.'},
                 status=status.HTTP_404_NOT_FOUND
             )
+        try:
+            captcha_valid = verify_recaptcha(
+                request.data.get('captcha_token'),
+                request.META.get('REMOTE_ADDR'),
+            )
+        except Exception:
+            logger.exception('Error validating reCAPTCHA.')
+            captcha_valid = False
+        if not captcha_valid:
+            return Response(
+                {'detail': 'No fue posible validar el CAPTCHA. Intenta nuevamente.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = RegistrationSubmitSerializer(
             data=request.data,
             context={'course': course, 'request': request}
         )
         if serializer.is_valid():
-            registration = serializer.create_registration(course, request)
+            identity = serializer.get_identity(course)
+            with transaction.atomic():
+                locked_course = Course.objects.select_for_update().get(pk=course.pk)
+                duplicate_query = Q(
+                    email_participante__iexact=identity['email']
+                )
+                if identity['employee_number']:
+                    duplicate_query |= Q(
+                        answers__campo_clave_snapshot='numero_empleado',
+                        answers__valor_texto=identity['employee_number'],
+                    )
+                duplicate_exists = CourseRegistration.objects.filter(
+                    administrador=course.administrador,
+                    course=locked_course,
+                    nombre_curso_snapshot__iexact=identity['course_name'],
+                    curso_archivado=False,
+                ).filter(duplicate_query).exists()
+                if duplicate_exists:
+                    return Response(
+                        {
+                            'detail': (
+                                'Ya existe una inscripción para este curso con '
+                                'el mismo correo o número de empleado.'
+                            )
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                registration = serializer.create_registration(locked_course, request)
             try:
                 send_registration_confirmation(registration)
             except Exception:
@@ -802,10 +845,11 @@ class SendDiplomaView(APIView):
         if not archivo:
             return Response({'detail': 'No se recibio archivo.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        ext = archivo.name.split('.')[-1].lower()
-        if ext not in ['pdf', 'jpg', 'jpeg', 'png']:
+        try:
+            validated_file = validate_diploma_upload(archivo)
+        except InvalidUpload as exc:
             return Response(
-                {'detail': 'Formato no permitido. Usa PDF, JPG o PNG.'},
+                {'detail': str(exc)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -831,20 +875,14 @@ class SendDiplomaView(APIView):
             f'2024 - 2027'
         )
 
-        content_types = {
-            'pdf':  'application/pdf',
-            'jpg':  'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png':  'image/png',
-        }
         try:
             send_email_with_attachment(
                 to_email=reg.email_participante,
                 subject=subject,
                 body=body,
-                filename=archivo.name,
-                content=archivo.read(),
-                content_type=content_types.get(ext, 'application/octet-stream'),
+                filename=validated_file['filename'],
+                content=validated_file['content'],
+                content_type=validated_file['content_type'],
             )
         except Exception as exc:
             logger.exception(

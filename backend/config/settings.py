@@ -23,8 +23,12 @@ SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+COOKIE_SECURE = config('COOKIE_SECURE', default=True, cast=bool)
+COOKIE_SAMESITE = config('COOKIE_SAMESITE', default='None')
+SESSION_COOKIE_SECURE = COOKIE_SECURE
+CSRF_COOKIE_SECURE = COOKIE_SECURE
+CSRF_COOKIE_SAMESITE = COOKIE_SAMESITE
+SESSION_COOKIE_SAMESITE = COOKIE_SAMESITE
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
 
 # ─────────────────────────────────────────────
@@ -42,6 +46,7 @@ INSTALLED_APPS = [
     # Third party
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'allauth',
     'allauth.account',
@@ -96,7 +101,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
-        'OPTIONS': {'sslmode': config('DB_SSLMODE', default='prefer')},
+        'OPTIONS': {'sslmode': config('DB_SSLMODE', default='require')},
     }
 }
 
@@ -155,7 +160,7 @@ SOCIALACCOUNT_PROVIDERS = {
 # ─────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.accounts.authentication.CookieJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -172,7 +177,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -186,6 +191,11 @@ REST_AUTH = {
     'JWT_AUTH_HTTPONLY': True,
     'REGISTER_SERIALIZER': 'apps.accounts.serializers.RegisterSerializer',
 }
+
+JWT_COOKIE_SECURE = config('JWT_COOKIE_SECURE', default=COOKIE_SECURE, cast=bool)
+JWT_COOKIE_SAMESITE = config('JWT_COOKIE_SAMESITE', default=COOKIE_SAMESITE)
+JWT_ACCESS_COOKIE_NAME = 'access-token'
+JWT_REFRESH_COOKIE_NAME = 'refresh-token'
 
 # ─────────────────────────────────────────────
 # CORS
@@ -232,6 +242,12 @@ CELERY_TASK_SERIALIZER = 'json'
 # APP CONFIG
 # ─────────────────────────────────────────────
 SITE_BASE_URL = config('SITE_BASE_URL', default='http://localhost:5173')
+RECAPTCHA_SECRET_KEY = config('RECAPTCHA_SECRET_KEY', default='')
+RECAPTCHA_ENABLED = config(
+    'RECAPTCHA_ENABLED',
+    default=bool(RECAPTCHA_SECRET_KEY),
+    cast=bool,
+)
 
 
 TEMPLATES = [

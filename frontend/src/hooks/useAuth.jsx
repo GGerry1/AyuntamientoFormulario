@@ -11,14 +11,12 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem('access_token');
-    if (!token) { setLoading(false); return; }
     try {
+      await authAPI.ensureCsrf();
       const { data } = await authAPI.me();
       setUser(data);
     } catch {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -26,20 +24,20 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { loadUser(); }, [loadUser]);
 
-  // Called after OAuth callback - tokens arrive via URL params
-  const loginWithTokens = useCallback((access, refresh, userData) => {
-    localStorage.setItem('access_token', access);
-    if (refresh) localStorage.setItem('refresh_token', refresh);
+  useEffect(() => {
+    const expireSession = () => setUser(null);
+    window.addEventListener('auth:expired', expireSession);
+    return () => window.removeEventListener('auth:expired', expireSession);
+  }, []);
+
+  const setAuthenticatedUser = useCallback((userData) => {
     setUser(userData);
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      const refresh = localStorage.getItem('refresh_token');
-      await authAPI.logout(refresh);
+      await authAPI.logout();
     } catch {}
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
     setUser(null);
   }, []);
 
@@ -49,7 +47,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithTokens, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, setAuthenticatedUser, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

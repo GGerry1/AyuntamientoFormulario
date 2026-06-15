@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'https://tusitio.com';
-// Reemplaza con tu Site Key real de Google reCAPTCHA v2
-const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'; // clave de prueba
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY ||
+  '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
 export default function AdminLoginPage() {
   const { user } = useAuth();

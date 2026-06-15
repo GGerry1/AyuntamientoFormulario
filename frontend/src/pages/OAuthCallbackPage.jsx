@@ -1,57 +1,36 @@
 /**
  * OAuthCallbackPage
- * After OAuth redirect, Django issues JWT -> we store it and go to dashboard
+ * Django sets HttpOnly auth cookies before redirecting here.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import api from '../utils/api';
+import { authAPI } from '../utils/api';
 
 export default function OAuthCallbackPage() {
   const [error, setError] = useState('');
-  const { loginWithTokens } = useAuth();
+  const { setAuthenticatedUser } = useAuth();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
 
-useEffect(() => {
+  useEffect(() => {
     async function handleCallback() {
-        try {
-            const access = params.get('access');
-            const refresh = params.get('refresh');
-
-            if (access) {
-                // Tokens vienen en la URL — usarlos direcgortamente
-                api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
-                const { data: user } = await api.get('/auth/me/');
-                loginWithTokens(access, refresh || '', user);
-                navigate('/dashboard', { replace: true });
-            } else {
-                setError('No se recibieron credenciales. Por favor intenta de nuevo.');
-            }
-        } catch (err) {
-    console.error('ERROR COMPLETO:', err);
-
-    if (err.response) {
-        console.error('STATUS:', err.response.status);
-        console.error('DATA:', err.response.data);
-
-        setError(
-            `Error ${err.response.status}: ${JSON.stringify(err.response.data)}`
-        );
-    } else {
-        setError(err.message);
-    }
-}
+      try {
+        await authAPI.ensureCsrf();
+        const { data: user } = await authAPI.me();
+        setAuthenticatedUser(user);
+        navigate('/dashboard', { replace: true });
+      } catch {
+        setError('No fue posible establecer la sesion. Intenta iniciar sesion nuevamente.');
+      }
     }
     handleCallback();
-}, []);
+  }, [navigate, setAuthenticatedUser]);
 
   if (error) {
     return (
       <div style={styles.page}>
         <div style={styles.box}>
-          <span style={{ fontSize: 48 }}>⚠️</span>
-          <p style={{ color: '#fff', marginTop: 16 }}>{error}</p>
+          <p style={{ color: '#fff' }}>{error}</p>
           <a href="/admin" style={styles.link}>Volver al inicio</a>
         </div>
       </div>
@@ -63,12 +42,10 @@ useEffect(() => {
       <div style={styles.box}>
         <div style={styles.spinner} />
         <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: 20 }}>
-          Verificando identidad…
+          Verificando identidad...
         </p>
       </div>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
@@ -79,9 +56,7 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: '#0f0a08', fontFamily: 'sans-serif',
   },
-  box: {
-    textAlign: 'center',
-  },
+  box: { textAlign: 'center' },
   spinner: {
     width: 52, height: 52,
     border: '3px solid rgba(184,149,42,0.25)',
