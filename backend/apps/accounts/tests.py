@@ -57,6 +57,8 @@ class OAuthCookieSecurityTests(TestCase):
         self.assertTrue(response.cookies['access-token']['httponly'])
         self.assertTrue(response.cookies['refresh-token']['httponly'])
         self.assertEqual(response.cookies['access-token']['samesite'], 'None')
+        self.assertEqual(response.cookies['access-token']['max-age'], '')
+        self.assertEqual(response.cookies['refresh-token']['max-age'], '')
 
     def test_cookie_authenticated_writes_require_csrf(self):
         user = Administrator.objects.create_user(email='csrf@example.com')

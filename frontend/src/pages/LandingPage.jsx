@@ -2,12 +2,20 @@
  * LandingPage — Paleta institucional Acapulco
  * v4: footer completo con direccion, telefono, emergencias
  */
+import { useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import {
   InstitutionalHeader,
   institutionalCss,
 } from '../components/public/InstitutionalLayout';
 
 export default function LandingPage() {
+  const { user, logout } = useAuth();
+
+  useEffect(() => {
+    if (user) logout();
+  }, [user, logout]);
+
   return (
     <div style={styles.page}>
       <style>{css}</style>

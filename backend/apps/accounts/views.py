@@ -122,17 +122,24 @@ def set_auth_cookies(response, access_token, refresh_token):
         'secure': settings.JWT_COOKIE_SECURE,
         'samesite': settings.JWT_COOKIE_SAMESITE,
     }
+    if settings.JWT_COOKIE_PERSISTENT:
+        access_max_age = int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds())
+        refresh_max_age = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
+    else:
+        access_max_age = None
+        refresh_max_age = None
+
     response.set_cookie(
         settings.JWT_ACCESS_COOKIE_NAME,
         access_token,
-        max_age=int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds()),
+        max_age=access_max_age,
         path='/',
         **common,
     )
     response.set_cookie(
         settings.JWT_REFRESH_COOKIE_NAME,
         refresh_token,
-        max_age=int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()),
+        max_age=refresh_max_age,
         path='/api/v1/auth/',
         **common,
     )
