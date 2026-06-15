@@ -404,7 +404,7 @@ function RegistrationField({ answer, onChange }) {
     input = <input type="datetime-local" {...commonProps} />;
   } else if (['select', 'radio'].includes(answer.field_tipo)) {
     input = (
-      <select {...commonProps}>
+      <select {...commonProps} className="registration-select">
         <option value="">Selecciona una opcion</option>
         {answer.options.map(option => (
           <option key={option.id} value={option.valor}>{option.etiqueta}</option>
@@ -606,6 +606,11 @@ const css = `
   .delete-btn:hover { background: rgba(248,113,113,0.12) !important; }
   .course-delete-btn:hover { background: rgba(248,113,113,0.1) !important; border-color: rgba(248,113,113,0.5) !important; color: #f87171 !important; }
   .drop-zone:hover { border-color: rgba(184,149,42,0.5) !important; background: rgba(184,149,42,0.06) !important; cursor: pointer; }
+  .registration-select { color-scheme: dark; }
+  .registration-select option {
+    background: #241a14;
+    color: #ffffff;
+  }
 `;
 
 /* ── Styles ──────────────────────────────────────────────────── */
